@@ -42,14 +42,37 @@ export const initialChores = {
     ]
 };
 
-export const mockEvents = [
-    { id: 1, title: 'Board Game Night', date: '2025-09-20T19:00:00', location: 'Living Room', createdBy: 'Chatur' },
-    { id: 2, title: 'Weekend Hiking Trip', date: '2025-09-27T08:00:00', location: 'Meet at entrance', createdBy: 'Deepak' }
-];
 
 export const mockLandlord = { name: 'Mr. Rajesh Sharma', phone: '+91 98765 43210', email: 'rajesh.sharma@gmail.com' };
 
 export const mockIssues = [
     { id: 1, title: 'Leaky Faucet in Kitchen', status: 'Reported', reportedBy: 'Abhay' },
     { id: 2, title: 'Balcony door lock is stiff', status: 'Resolved', reportedBy: 'Bilal' }
+];
+
+export const mockEvents = [
+  { 
+    id: 1, 
+    title: 'Board Game Night', 
+    date: '2025-09-20T19:00:00', 
+    location: 'Living Room', 
+    createdBy: 'Chatur',
+    rsvps: {
+      going: [],
+      maybe: [],
+      notGoing: []
+    }
+  },
+  { 
+    id: 2, 
+    title: 'Weekend Hiking Trip', 
+    date: '2025-09-27T08:00:00', 
+    location: 'Meet at entrance', 
+    createdBy: 'Deepak',
+    rsvps: {
+      going: [],
+      maybe: [],
+      notGoing: []
+    }
+  }
 ];

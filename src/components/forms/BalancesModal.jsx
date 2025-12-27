@@ -56,7 +56,7 @@ const BalancesModal = ({ onClose, balances }) => {
           ) : <p className="text-sm text-gray-500">Nobody owes you anything.</p>}
         </div>
         <div className="text-center p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs text-gray-600 dark:text-gray-400">
-          Payments are handled outside the app via UPI, Venmo, cash, etc. Use "Settle" to record a payment you've made.
+          Payments are handled outside the app via UPI, cash, etc. Use "Settle" to record a payment you've made.
         </div>
       </div>
     </div>
