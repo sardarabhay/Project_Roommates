@@ -18,6 +18,7 @@ model User {
 
   // Relations
   paidExpenses    Expense[]      @relation("PaidByUser")
+  createdExpenses Expense[]      @relation("CreatedByUser")
   owedSplits      ExpenseSplit[] @relation("OwedByUser")
   assignedChores  Chore[]        @relation("AssignedToUser")
   createdEvents   Event[]        @relation("CreatedByUser")
@@ -31,14 +32,17 @@ model Expense {
   id          Int      @id @default(autoincrement())
   description String
   totalAmount Float
+  category    String   @default("other") // groceries, rent, utilities, food, entertainment, transport, household, other
   date        DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  paidByUserId Int
-  paidByUser   User           @relation("PaidByUser", fields: [paidByUserId], references: [id])
-  splits       ExpenseSplit[]
+  paidByUserId    Int
+  paidByUser      User           @relation("PaidByUser", fields: [paidByUserId], references: [id])
+  createdByUserId Int?
+  createdByUser   User?          @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  splits          ExpenseSplit[]
 }
 
 model ExpenseSplit {

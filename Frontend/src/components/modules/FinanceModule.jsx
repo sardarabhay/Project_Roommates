@@ -1,26 +1,29 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../common/Card';
 import ModuleHeader from '../common/ModuleHeader';
 import { expensesApi } from '../../services/api';
+import { getCategoryInfo } from '../forms/AddExpenseForm';
 
-const FinanceModule = ({ onAddExpense, onSettleUp, balances }) => {
+const FinanceModule = ({ onAddExpense, onSettleUp, balances, refreshKey, onEditExpense }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchExpenses = async () => {
-      try {
-        const data = await expensesApi.getAll();
-        setExpenses(data);
-      } catch (error) {
-        console.error('Failed to fetch expenses:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchExpenses();
+  const fetchExpenses = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await expensesApi.getAll();
+      setExpenses(data);
+    } catch (error) {
+      console.error('Failed to fetch expenses:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses, refreshKey]);
 
   // Calculate total spending this month
   const currentMonth = new Date().getMonth();
@@ -57,17 +60,33 @@ const FinanceModule = ({ onAddExpense, onSettleUp, balances }) => {
           <p className="text-gray-500">No expenses yet. Add your first expense!</p>
         ) : (
           <ul className="divide-y dark:divide-gray-700">
-            {expenses.slice(0, 10).map(exp => (
-              <li key={exp.id} className="py-4 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold">{exp.description}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Paid by {exp.paidByUser?.name} on {new Date(exp.date).toLocaleDateString()}
-                  </p>
-                </div>
-                <p className="font-bold text-lg">₹{exp.totalAmount.toFixed(2)}</p>
-              </li>
-            ))}
+            {expenses.slice(0, 10).map(exp => {
+              const category = getCategoryInfo(exp.category);
+              const CategoryIcon = category.icon;
+              return (
+                <li 
+                  key={exp.id} 
+                  className="py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 -mx-4 px-4 cursor-pointer rounded-lg transition-colors"
+                  onClick={() => onEditExpense && onEditExpense(exp)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full ${category.color}`}>
+                      <CategoryIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{exp.description}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Paid by {exp.paidByUser?.name} on {new Date(exp.date).toLocaleDateString()}
+                        {exp.createdByUser && exp.createdByUser.id !== exp.paidByUser?.id && (
+                          <span className="ml-2 text-xs text-gray-400">(added by {exp.createdByUser.name})</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-lg">₹{exp.totalAmount.toFixed(2)}</p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>

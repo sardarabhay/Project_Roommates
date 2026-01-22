@@ -15,6 +15,7 @@ import AddTaskForm from './components/forms/AddTaskForm';
 import ReportIssueForm from './components/forms/ReportIssueForm';
 import CreateEventForm from './components/forms/CreateEventForm';
 import BalancesModal from './components/forms/BalancesModal';
+import EditExpenseModal from './components/forms/EditExpenseModal';
 import { useBalances } from './hooks/useBalances';
 import { getUser, clearAuth, authApi } from './services/api';
 
@@ -25,8 +26,15 @@ export default function App() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isDarkMode, setDarkMode] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const balances = useBalances(currentUser);
+
+  const handleExpenseAdded = () => {
+    balances.refreshBalances();
+    setRefreshKey(k => k + 1);
+  };
 
   // Check for existing auth on mount
   useEffect(() => {
@@ -77,12 +85,20 @@ export default function App() {
   };
 
   const openModal = (modalType) => setActiveModal(modalType);
-  const closeModal = () => setActiveModal(null);
+  const closeModal = () => {
+    setActiveModal(null);
+    setSelectedExpense(null);
+  };
+
+  const handleEditExpense = (expense) => {
+    setSelectedExpense(expense);
+    setActiveModal('editExpense');
+  };
 
   const renderModule = () => {
     switch (activeModule) {
       case 'dashboard': return <DashboardModule setActiveModule={setActiveModule} balances={balances} user={currentUser} />;
-      case 'finance': return <FinanceModule onAddExpense={() => openModal('addExpense')} onSettleUp={() => openModal('settleUp')} balances={balances} />;
+      case 'finance': return <FinanceModule onAddExpense={() => openModal('addExpense')} onSettleUp={() => openModal('settleUp')} balances={balances} refreshKey={refreshKey} onEditExpense={handleEditExpense} />;
       case 'chores': return <ChoresModule onAddTask={() => openModal('addTask')} user={currentUser} />;
       case 'communication': return <CommunicationModule />;
       case 'landlord': return <LandlordModule onReportIssue={() => openModal('reportIssue')} />;
@@ -93,11 +109,12 @@ export default function App() {
 
   const renderModalContent = () => {
     switch (activeModal) {
-      case 'addExpense': return <AddExpenseForm onClose={closeModal} />;
+      case 'addExpense': return <AddExpenseForm onClose={closeModal} onSuccess={handleExpenseAdded} />;
+      case 'editExpense': return selectedExpense ? <EditExpenseModal expense={selectedExpense} onClose={closeModal} onSuccess={handleExpenseAdded} /> : null;
       case 'addTask': return <AddTaskForm onClose={closeModal} />;
       case 'reportIssue': return <ReportIssueForm onClose={closeModal} />;
       case 'createEvent': return <CreateEventForm onClose={closeModal} />;
-      case 'settleUp': return <BalancesModal onClose={closeModal} balances={balances} />;
+      case 'settleUp': return <BalancesModal onClose={closeModal} balances={balances} onSettle={handleExpenseAdded} />;
       default: return null;
     }
   };

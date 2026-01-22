@@ -156,6 +156,12 @@ export const expensesApi = {
       method: 'PUT',
     });
   },
+
+  settleWithUser: async (userId) => {
+    return fetchWithAuth(`/expenses/settle-with/${userId}`, {
+      method: 'PUT',
+    });
+  },
 };
 
 // === CHORES API ===

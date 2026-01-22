@@ -1,8 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, ShoppingCart, Home, Zap, Utensils, Film, Car, Package, MoreHorizontal } from 'lucide-react';
 import FormInput from '../auth/FormInput';
 import { usersApi, expensesApi, getUser } from '../../services/api';
+
+const EXPENSE_CATEGORIES = [
+  { id: 'groceries', label: 'Groceries', icon: ShoppingCart, color: 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300' },
+  { id: 'rent', label: 'Rent', icon: Home, color: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' },
+  { id: 'utilities', label: 'Utilities', icon: Zap, color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300' },
+  { id: 'food', label: 'Food & Dining', icon: Utensils, color: 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300' },
+  { id: 'entertainment', label: 'Entertainment', icon: Film, color: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300' },
+  { id: 'transport', label: 'Transport', icon: Car, color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900 dark:text-cyan-300' },
+  { id: 'household', label: 'Household', icon: Package, color: 'bg-pink-100 text-pink-600 dark:bg-pink-900 dark:text-pink-300' },
+  { id: 'other', label: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+];
+
+export const getCategoryInfo = (categoryId) => {
+  return EXPENSE_CATEGORIES.find(c => c.id === categoryId) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+};
 
 const FormSelect = ({ label, children, error, ...props }) => (
   <div>
@@ -17,13 +32,14 @@ const FormSelect = ({ label, children, error, ...props }) => (
   </div>
 );
 
-const AddExpenseForm = ({ onClose }) => {
+const AddExpenseForm = ({ onClose, onSuccess }) => {
   const [users, setUsers] = useState([]);
   const currentUser = getUser();
   const [formData, setFormData] = useState({ 
     description: '', 
     amount: '', 
-    paidByUserId: currentUser?.id || '' 
+    paidByUserId: currentUser?.id || '',
+    category: 'other'
   });
   const [errors, setErrors] = useState({});
   const [splitEqually, setSplitEqually] = useState(true);
@@ -68,9 +84,9 @@ const AddExpenseForm = ({ onClose }) => {
           description: formData.description,
           totalAmount: parseFloat(formData.amount),
           paidByUserId: parseInt(formData.paidByUserId),
-          // If splitting equally, backend will handle it
-          // Otherwise, we could add custom split logic here
+          category: formData.category,
         });
+        if (onSuccess) onSuccess();
         onClose();
       } catch (error) {
         console.error('Failed to add expense:', error);
@@ -88,8 +104,36 @@ const AddExpenseForm = ({ onClose }) => {
         <button onClick={onClose}><X className="w-6 h-6 text-gray-500" /></button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <FormInput label="Description" name="description" placeholder="e.g., Groceries, Rent" value={formData.description} onChange={handleChange} error={errors.description} />
+        <FormInput label="Description" name="description" placeholder="e.g., Weekly groceries" value={formData.description} onChange={handleChange} error={errors.description} />
         <FormInput label="Amount (₹)" name="amount" type="number" placeholder="0.00" value={formData.amount} onChange={handleChange} error={errors.amount} />
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+          <div className="grid grid-cols-4 gap-2">
+            {EXPENSE_CATEGORIES.map(cat => {
+              const Icon = cat.icon;
+              const isSelected = formData.category === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, category: cat.id })}
+                  className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
+                    isSelected 
+                      ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30' 
+                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className={`p-2 rounded-full ${cat.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs mt-1 text-center">{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <FormSelect label="Paid By" name="paidByUserId" value={formData.paidByUserId} onChange={handleChange}>
           {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </FormSelect>

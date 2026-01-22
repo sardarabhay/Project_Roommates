@@ -19,6 +19,9 @@ router.get('/', authenticateToken, async (req, res) => {
         paidByUser: {
           select: { id: true, name: true, avatarUrl: true },
         },
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
         splits: {
           include: {
             owedByUser: {
@@ -92,7 +95,7 @@ router.post('/', authenticateToken, validateExpense, async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { description, totalAmount, paidByUserId, date, splits } = req.body;
+    const { description, totalAmount, paidByUserId, date, splits, category } = req.body;
 
     // Get all users if splitting equally
     let splitData = splits;
@@ -111,7 +114,9 @@ router.post('/', authenticateToken, validateExpense, async (req, res) => {
       data: {
         description,
         totalAmount,
+        category: category || 'other',
         paidByUserId: paidByUserId || req.user.id,
+        createdByUserId: req.user.id,
         date: date ? new Date(date) : new Date(),
         splits: {
           create: splitData,
@@ -119,6 +124,7 @@ router.post('/', authenticateToken, validateExpense, async (req, res) => {
       },
       include: {
         paidByUser: { select: { id: true, name: true, avatarUrl: true } },
+        createdByUser: { select: { id: true, name: true, avatarUrl: true } },
         splits: {
           include: {
             owedByUser: { select: { id: true, name: true, avatarUrl: true } },
@@ -137,7 +143,7 @@ router.post('/', authenticateToken, validateExpense, async (req, res) => {
 // PUT /api/expenses/:id - Update expense
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { description, totalAmount, date } = req.body;
+    const { description, totalAmount, date, category } = req.body;
 
     const expense = await prisma.expense.update({
       where: { id: parseInt(req.params.id) },
@@ -145,9 +151,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
         ...(description && { description }),
         ...(totalAmount && { totalAmount }),
         ...(date && { date: new Date(date) }),
+        ...(category && { category }),
       },
       include: {
         paidByUser: { select: { id: true, name: true, avatarUrl: true } },
+        createdByUser: { select: { id: true, name: true, avatarUrl: true } },
         splits: {
           include: {
             owedByUser: { select: { id: true, name: true, avatarUrl: true } },
@@ -193,6 +201,35 @@ router.put('/splits/:id/settle', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Settle split error:', error);
     res.status(500).json({ error: 'Failed to settle split' });
+  }
+});
+
+// PUT /api/expenses/settle-with/:userId - Settle all splits with a specific user
+router.put('/settle-with/:userId', authenticateToken, async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const otherUserId = parseInt(req.params.userId);
+
+    // Settle splits where current user owes the other user
+    // (splits where current user is owedByUser and other user paid)
+    const settledSplits = await prisma.expenseSplit.updateMany({
+      where: {
+        owedByUserId: currentUserId,
+        status: 'pending',
+        expense: {
+          paidByUserId: otherUserId,
+        },
+      },
+      data: { status: 'settled' },
+    });
+
+    res.json({ 
+      message: 'Settled successfully', 
+      settledCount: settledSplits.count 
+    });
+  } catch (error) {
+    console.error('Settle with user error:', error);
+    res.status(500).json({ error: 'Failed to settle' });
   }
 });
 
