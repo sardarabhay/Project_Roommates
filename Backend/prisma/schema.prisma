@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  paidExpenses    Expense[]      @relation("PaidByUser")
+  owedSplits      ExpenseSplit[] @relation("OwedByUser")
+  assignedChores  Chore[]        @relation("AssignedToUser")
+  createdEvents   Event[]        @relation("CreatedByUser")
+  eventRsvps      EventRsvp[]
+  reportedIssues  Issue[]        @relation("ReportedByUser")
+  uploadedDocs    Document[]     @relation("UploadedByUser")
+  bulletinPosts   BulletinPost[] @relation("PostedByUser")
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  description String
+  totalAmount Float
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  paidByUserId Int
+  paidByUser   User           @relation("PaidByUser", fields: [paidByUserId], references: [id])
+  splits       ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id        Int      @id @default(autoincrement())
+  amount    Float
+  status    String   @default("pending") // pending, settled
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  expenseId     Int
+  expense       Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  owedByUserId  Int
+  owedByUser    User    @relation("OwedByUser", fields: [owedByUserId], references: [id])
+
+  @@unique([expenseId, owedByUserId])
+}
+
+model Chore {
+  id        Int       @id @default(autoincrement())
+  title     String
+  points    Int       @default(0)
+  status    String    @default("todo") // todo, in_progress, done
+  dueDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  assignedToUserId Int?
+  assignedToUser   User? @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
+}
+
+model Event {
+  id        Int      @id @default(autoincrement())
+  title     String
+  date      DateTime
+  location  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdByUserId Int
+  createdByUser   User        @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  rsvps           EventRsvp[]
+}
+
+model EventRsvp {
+  id        Int      @id @default(autoincrement())
+  status    String   // going, maybe, not-going
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  eventId Int
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  Int
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+model Issue {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      String   @default("Reported") // Reported, In Progress, Resolved
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  reportedByUserId Int
+  reportedByUser   User @relation("ReportedByUser", fields: [reportedByUserId], references: [id])
+}
+
+model Document {
+  id        Int      @id @default(autoincrement())
+  name      String
+  fileUrl   String?
+  size      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  uploadedByUserId Int
+  uploadedByUser   User @relation("UploadedByUser", fields: [uploadedByUserId], references: [id])
+}
+
+model Landlord {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HouseRule {
+  id        Int      @id @default(autoincrement())
+  content   String
+  orderNum  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BulletinPost {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  postedByUserId Int
+  postedByUser   User @relation("PostedByUser", fields: [postedByUserId], references: [id])
+}

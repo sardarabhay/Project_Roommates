@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormInput from '../auth/FormInput';
-import { allUsers, mockUser } from '../../data/mockData';
+import { usersApi, choresApi } from '../../services/api';
 
 const FormSelect = ({ label, children, error, ...props }) => (
   <div>
@@ -18,8 +18,22 @@ const FormSelect = ({ label, children, error, ...props }) => (
 );
 
 const AddTaskForm = ({ onClose }) => {
-  const [formData, setFormData] = useState({ title: '', assignedTo: 'unassigned', points: '', dueDate: '' });
+  const [users, setUsers] = useState([]);
+  const [formData, setFormData] = useState({ title: '', assignedToUserId: '', points: '', dueDate: '' });
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await usersApi.getAll();
+        setUsers(data);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -34,13 +48,27 @@ const AddTaskForm = ({ onClose }) => {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     setErrors(validationErrors);
+    
     if (Object.keys(validationErrors).length === 0) {
-      console.log("Task Added:", formData);
-      onClose();
+      setIsSubmitting(true);
+      try {
+        await choresApi.create({
+          title: formData.title,
+          assignedToUserId: formData.assignedToUserId ? parseInt(formData.assignedToUserId) : null,
+          points: formData.points ? parseInt(formData.points) : 0,
+          dueDate: formData.dueDate || null,
+        });
+        onClose();
+      } catch (error) {
+        console.error('Failed to add task:', error);
+        setErrors({ submit: error.message });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -52,15 +80,18 @@ const AddTaskForm = ({ onClose }) => {
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormInput label="Task Title" name="title" placeholder="e.g., Clean the living room" value={formData.title} onChange={handleChange} error={errors.title} />
-        <FormSelect label="Assign To" name="assignedTo" value={formData.assignedTo} onChange={handleChange}>
-          <option value="unassigned">Unassigned</option>
-          {allUsers.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+        <FormSelect label="Assign To" name="assignedToUserId" value={formData.assignedToUserId} onChange={handleChange}>
+          <option value="">Unassigned</option>
+          {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </FormSelect>
         <FormInput label="Points" name="points" type="number" placeholder="e.g., 10" value={formData.points} onChange={handleChange} />
         <FormInput label="Due Date" name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} error={errors.dueDate} />
+        {errors.submit && <p className="text-red-500 text-sm">{errors.submit}</p>}
         <div className="flex justify-end space-x-3 pt-4">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
-          <button type="submit" className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700">Add Task</button>
+          <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+            {isSubmitting ? 'Adding...' : 'Add Task'}
+          </button>
         </div>
       </form>
     </div>

@@ -1,46 +1,91 @@
 import { Plus, Upload, FileText, Edit, Trash2, Download } from 'lucide-react';
 import Card from '../common/Card';
 import ModuleHeader from '../common/ModuleHeader';
-import { mockLandlord, mockIssues } from '../../data/mockData';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { landlordApi, issuesApi, documentsApi } from '../../services/api';
 
 const LandlordModule = ({ onReportIssue }) => {
-  const [documents, setDocuments] = useState([
-    { id: 1, name: 'Rental Agreement 2025.pdf', uploadedBy: 'Abhay', date: '2025-01-15', size: '2.4 MB' }
-  ]);
-  
-  const [issues, setIssues] = useState(mockIssues);
+  const [landlord, setLandlord] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newDocument, setNewDocument] = useState({ name: '', file: null });
 
-  const handleUploadDocument = () => {
-    if (newDocument.name && newDocument.file) {
-      const newDoc = {
-        id: documents.length + 1,
-        name: newDocument.name,
-        uploadedBy: 'Abhay',
-        date: new Date().toISOString().split('T')[0],
-        size: '1.2 MB'
-      };
-      setDocuments([...documents, newDoc]);
-      setNewDocument({ name: '', file: null });
-      setShowUploadModal(false);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [landlordData, issuesData, docsData] = await Promise.all([
+        landlordApi.get(),
+        issuesApi.getAll(),
+        documentsApi.getAll()
+      ]);
+      setLandlord(landlordData);
+      setIssues(issuesData);
+      setDocuments(docsData);
+    } catch (error) {
+      console.error('Failed to fetch landlord data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteDocument = (docId) => {
-    setDocuments(documents.filter(doc => doc.id !== docId));
+  const handleUploadDocument = async () => {
+    if (newDocument.name) {
+      try {
+        await documentsApi.create({
+          name: newDocument.name,
+          size: '1.2 MB' // Placeholder - real file upload would have actual size
+        });
+        fetchData(); // Refresh
+        setNewDocument({ name: '', file: null });
+        setShowUploadModal(false);
+      } catch (error) {
+        console.error('Failed to upload document:', error);
+      }
+    }
   };
 
-  const handleUpdateIssueStatus = (issueId, newStatus) => {
-    setIssues(issues.map(issue => 
-      issue.id === issueId ? { ...issue, status: newStatus } : issue
-    ));
+  const handleDeleteDocument = async (docId) => {
+    try {
+      await documentsApi.delete(docId);
+      setDocuments(documents.filter(doc => doc.id !== docId));
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+    }
   };
 
-  const handleDeleteIssue = (issueId) => {
-    setIssues(issues.filter(issue => issue.id !== issueId));
+  const handleUpdateIssueStatus = async (issueId, newStatus) => {
+    try {
+      await issuesApi.updateStatus(issueId, newStatus);
+      setIssues(issues.map(issue => 
+        issue.id === issueId ? { ...issue, status: newStatus } : issue
+      ));
+    } catch (error) {
+      console.error('Failed to update issue status:', error);
+    }
   };
+
+  const handleDeleteIssue = async (issueId) => {
+    try {
+      await issuesApi.delete(issueId);
+      setIssues(issues.filter(issue => issue.id !== issueId));
+    } catch (error) {
+      console.error('Failed to delete issue:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <ModuleHeader title="Landlord & Property" actionText="Report Issue" onActionClick={onReportIssue} />
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -49,57 +94,60 @@ const LandlordModule = ({ onReportIssue }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-1">
           <h3 className="font-bold text-lg mb-4">Landlord Info</h3>
-          <p className="font-semibold text-xl">{mockLandlord.name}</p>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">{mockLandlord.phone}</p>
-          <p className="text-gray-600 dark:text-gray-300">{mockLandlord.email}</p>
+          {landlord ? (
+            <>
+              <p className="font-semibold text-xl">{landlord.name}</p>
+              <p className="text-gray-600 dark:text-gray-300 mt-2">{landlord.phone}</p>
+              <p className="text-gray-600 dark:text-gray-300">{landlord.email}</p>
+            </>
+          ) : (
+            <p className="text-gray-500">No landlord info available</p>
+          )}
         </Card>
         
         <Card className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-lg">Reported Issues</h3>
-            {/* <button 
-              onClick={onReportIssue}
-              className="flex items-center bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-700 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Report Issue
-            </button> */}
           </div>
-          <ul className="divide-y dark:divide-gray-700">
-            {issues.map(issue => (
-              <li key={issue.id} className="py-3 flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="font-semibold">{issue.title}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Reported by {issue.reportedBy}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <select 
-                    value={issue.status}
-                    onChange={(e) => handleUpdateIssueStatus(issue.id, e.target.value)}
-                    className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                      issue.status === 'Resolved' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200' 
-                        : issue.status === 'In Progress'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200'
-                    }`}
-                  >
-                    <option value="Reported">Reported</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Resolved">Resolved</option>
-                  </select>
-                  <button 
-                    onClick={() => handleDeleteIssue(issue.id)}
-                    className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {issues.length === 0 ? (
+            <p className="text-gray-500">No issues reported</p>
+          ) : (
+            <ul className="divide-y dark:divide-gray-700">
+              {issues.map(issue => (
+                <li key={issue.id} className="py-3 flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-semibold">{issue.title}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Reported by {issue.reportedByUser?.name}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <select 
+                      value={issue.status}
+                      onChange={(e) => handleUpdateIssueStatus(issue.id, e.target.value)}
+                      className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                        issue.status === 'Resolved' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200' 
+                          : issue.status === 'In Progress'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200'
+                      }`}
+                    >
+                      <option value="Reported">Reported</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                    <button 
+                      onClick={() => handleDeleteIssue(issue.id)}
+                      className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
 
@@ -124,7 +172,7 @@ const LandlordModule = ({ onReportIssue }) => {
                 <div>
                   <p className="font-semibold">{doc.name}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Uploaded by {doc.uploadedBy} on {doc.date} • {doc.size}
+                    Uploaded by {doc.uploadedByUser?.name} on {new Date(doc.createdAt).toLocaleDateString()} • {doc.size || 'N/A'}
                   </p>
                 </div>
               </div>

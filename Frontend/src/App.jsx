@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthPage from './components/auth/AuthPage';
 import SuccessMessage from './components/auth/SuccessMessage';
 import Header from './components/common/Header';
@@ -16,20 +16,54 @@ import ReportIssueForm from './components/forms/ReportIssueForm';
 import CreateEventForm from './components/forms/CreateEventForm';
 import BalancesModal from './components/forms/BalancesModal';
 import { useBalances } from './hooks/useBalances';
-import { mockUser } from './data/mockData';
+import { getUser, clearAuth, authApi } from './services/api';
 
 export default function App() {
-  const [authState, setAuthState] = useState('login'); 
+  const [authState, setAuthState] = useState('loading'); 
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeModule, setActiveModule] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isDarkMode, setDarkMode] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
 
-  const balances = useBalances();
+  const balances = useBalances(currentUser);
 
-  const handleLogin = () => setAuthState('logged-in');
+  // Check for existing auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const storedUser = getUser();
+      if (storedUser) {
+        try {
+          // Verify token is still valid
+          const user = await authApi.getCurrentUser();
+          setCurrentUser(user);
+          setAuthState('logged-in');
+        } catch (error) {
+          // Token invalid, clear and show login
+          clearAuth();
+          setAuthState('login');
+        }
+      } else {
+        setAuthState('login');
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogin = () => {
+    const user = getUser();
+    setCurrentUser(user);
+    setAuthState('logged-in');
+  };
+
   const handleSignupSuccess = () => setAuthState('signup-success');
-  const handleLogout = () => setAuthState('login');
+  
+  const handleLogout = () => {
+    clearAuth();
+    setCurrentUser(null);
+    setAuthState('login');
+  };
+  
   const handleContinueToLogin = () => setAuthState('login');
 
   const toggleTheme = () => {
@@ -47,13 +81,13 @@ export default function App() {
 
   const renderModule = () => {
     switch (activeModule) {
-      case 'dashboard': return <DashboardModule setActiveModule={setActiveModule} balances={balances} />;
+      case 'dashboard': return <DashboardModule setActiveModule={setActiveModule} balances={balances} user={currentUser} />;
       case 'finance': return <FinanceModule onAddExpense={() => openModal('addExpense')} onSettleUp={() => openModal('settleUp')} balances={balances} />;
-      case 'chores': return <ChoresModule onAddTask={() => openModal('addTask')} />;
+      case 'chores': return <ChoresModule onAddTask={() => openModal('addTask')} user={currentUser} />;
       case 'communication': return <CommunicationModule />;
       case 'landlord': return <LandlordModule onReportIssue={() => openModal('reportIssue')} />;
-      case 'events': return <EventsModule onCreateEvent={() => openModal('createEvent')} />;
-      default: return <DashboardModule setActiveModule={setActiveModule} balances={balances} />;
+      case 'events': return <EventsModule onCreateEvent={() => openModal('createEvent')} user={currentUser} />;
+      default: return <DashboardModule setActiveModule={setActiveModule} balances={balances} user={currentUser} />;
     }
   };
 
@@ -69,6 +103,17 @@ export default function App() {
   };
 
   
+  if (authState === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (authState === 'login') {
     return <AuthPage onLogin={handleLogin} onSignupSuccess={handleSignupSuccess} />;
   }
@@ -77,12 +122,15 @@ export default function App() {
     return <SuccessMessage onContinue={handleContinueToLogin} />;
   }
 
+  // Create user object for header (use currentUser from API)
+  const user = currentUser || { id: 0, name: 'User', avatarUrl: 'https://placehold.co/100x100/A8D5BA/004643?text=U' };
+
   return (
     <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50'}`}>
       <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          user={mockUser} 
+          user={user} 
           setSidebarOpen={setSidebarOpen} 
           toggleTheme={toggleTheme} 
           isDarkMode={isDarkMode} 

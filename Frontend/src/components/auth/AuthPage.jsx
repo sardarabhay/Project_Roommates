@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { GoogleIcon } from './GoogleIcon';
 import FormInput from './FormInput';
 import Card from '../common/Card';
+import { authApi } from '../../services/api';
 
 const AuthPage = ({ onLogin, onSignupSuccess }) => {
   const [isLoginView, setIsLoginView] = useState(true);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setApiError('');
   };
 
   const validate = () => {
@@ -33,33 +36,45 @@ const AuthPage = ({ onLogin, onSignupSuccess }) => {
     e.preventDefault();
     const validationErrors = validate();
     setErrors(validationErrors);
+    setApiError('');
     
     if (Object.keys(validationErrors).length === 0) {
       setIsLoading(true);
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('Form submitted successfully:', formData);
-      
-      if (isLoginView) {
-        onLogin();
-      } else {
-        onSignupSuccess();
-        setIsLoginView(true);
-        setFormData({ name: '', email: '', password: '' });
+      try {
+        if (isLoginView) {
+          await authApi.login(formData.email, formData.password);
+          onLogin();
+        } else {
+          await authApi.signup(formData.name, formData.email, formData.password);
+          onSignupSuccess();
+          setIsLoginView(true);
+          setFormData({ name: '', email: '', password: '' });
+        }
+      } catch (error) {
+        setApiError(error.message || 'Something went wrong. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setApiError('');
     
-    setTimeout(() => {
+    try {
+      // For demo purposes, simulate Google OAuth with a test user
+      // In production, you would integrate with actual Google OAuth
+      const demoEmail = 'demo@harmonyhomes.com';
+      const demoName = 'Demo User';
+      await authApi.googleLogin(demoEmail, demoName);
       onLogin();
+    } catch (error) {
+      setApiError(error.message || 'Google login failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const switchToLogin = () => {
@@ -89,6 +104,12 @@ const AuthPage = ({ onLogin, onSignupSuccess }) => {
           <p className="text-center text-gray-500 mb-6">
             {isLoginView ? 'Sign in to continue.' : 'Get started in seconds.'}
           </p>
+          
+          {apiError && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>
+            </div>
+          )}
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">

@@ -1,46 +1,55 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Circle, ArrowRightCircle, CheckCircle } from 'lucide-react';
 import ModuleHeader from '../common/ModuleHeader';
 import ChoreCard from './ChoreCard';
-import { initialChores, mockUser } from '../../data/mockData';
+import { choresApi } from '../../services/api';
 
-const ChoresModule = ({ onAddTask }) => {
-  const [chores, setChores] = useState(initialChores);
+const ChoresModule = ({ onAddTask, user }) => {
+  const [chores, setChores] = useState({ todo: [], in_progress: [], done: [] });
+  const [loading, setLoading] = useState(true);
 
-  const findTask = (taskId) => {
-    for (const status in chores) {
-      const task = chores[status].find(t => t.id === taskId);
-      if (task) return { task, status };
+  useEffect(() => {
+    fetchChores();
+  }, []);
+
+  const fetchChores = async () => {
+    try {
+      const data = await choresApi.getAll();
+      setChores(data);
+    } catch (error) {
+      console.error('Failed to fetch chores:', error);
+    } finally {
+      setLoading(false);
     }
-    return { task: null, status: null };
   };
 
-  const handleUpdateStatus = (taskId, newStatus) => {
-    const { task, status: oldStatus } = findTask(taskId);
-    if (!task) return;
-
-    setChores(prevChores => {
-      const newChores = { ...prevChores };
-      
-      newChores[oldStatus] = newChores[oldStatus].filter(t => t.id !== taskId);
-    
-      newChores[newStatus] = [...newChores[newStatus], { ...task, status: newStatus }];
-      return newChores;
-    });
+  const handleUpdateStatus = async (taskId, newStatus) => {
+    try {
+      await choresApi.updateStatus(taskId, newStatus);
+      fetchChores(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to update chore status:', error);
+    }
   };
   
-  const handleClaimTask = (taskId) => {
-    const { task, status: oldStatus } = findTask(taskId);
-    if (!task || task.assignedTo !== 'Unassigned') return;
-    
-    setChores(prevChores => {
-      const newChores = { ...prevChores };
-      newChores[oldStatus] = newChores[oldStatus].filter(t => t.id !== taskId);
-      newChores['in_progress'] = [...newChores['in_progress'], { ...task, assignedTo: mockUser.name, status: 'in_progress' }];
-      return newChores;
-    });
+  const handleClaimTask = async (taskId) => {
+    try {
+      await choresApi.claim(taskId);
+      fetchChores(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to claim chore:', error);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <ModuleHeader title="Chores & Tasks" actionText="Add Task" onActionClick={onAddTask} />
+        <p className="text-gray-500">Loading chores...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -56,7 +65,16 @@ const ChoresModule = ({ onAddTask }) => {
             </h3>
             <div className="space-y-4 bg-gray-100 dark:bg-gray-900/50 p-4 rounded-lg h-full min-h-[200px]">
               {tasks.map(task => (
-                <ChoreCard key={task.id} task={{...task, status}} onUpdateStatus={handleUpdateStatus} onClaimTask={handleClaimTask}/>
+                <ChoreCard 
+                  key={task.id} 
+                  task={{
+                    ...task, 
+                    status,
+                    assignedTo: task.assignedToUser?.name || 'Unassigned'
+                  }} 
+                  onUpdateStatus={handleUpdateStatus} 
+                  onClaimTask={handleClaimTask}
+                />
               ))}
             </div>
           </div>

@@ -1,0 +1,236 @@
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import prisma from '../lib/prisma.js';
+import { authenticateToken } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// Validation
+const validateEvent = [
+  body('title').trim().notEmpty().withMessage('Title is required'),
+  body('location').trim().notEmpty().withMessage('Location is required'),
+  body('date').notEmpty().withMessage('Date is required'),
+];
+
+// GET /api/events - Get all events
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const events = await prisma.event.findMany({
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        rsvps: {
+          include: {
+            user: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Transform RSVPs into grouped format
+    const eventsWithGroupedRsvps = events.map((event) => {
+      const going = event.rsvps.filter((r) => r.status === 'going').map((r) => r.user);
+      const maybe = event.rsvps.filter((r) => r.status === 'maybe').map((r) => r.user);
+      const notGoing = event.rsvps.filter((r) => r.status === 'not-going').map((r) => r.user);
+
+      return {
+        ...event,
+        rsvps: { going, maybe, notGoing },
+      };
+    });
+
+    res.json(eventsWithGroupedRsvps);
+  } catch (error) {
+    console.error('Get events error:', error);
+    res.status(500).json({ error: 'Failed to get events' });
+  }
+});
+
+// GET /api/events/:id - Get single event
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const event = await prisma.event.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        rsvps: {
+          include: {
+            user: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Transform RSVPs
+    const going = event.rsvps.filter((r) => r.status === 'going').map((r) => r.user);
+    const maybe = event.rsvps.filter((r) => r.status === 'maybe').map((r) => r.user);
+    const notGoing = event.rsvps.filter((r) => r.status === 'not-going').map((r) => r.user);
+
+    res.json({
+      ...event,
+      rsvps: { going, maybe, notGoing },
+    });
+  } catch (error) {
+    console.error('Get event error:', error);
+    res.status(500).json({ error: 'Failed to get event' });
+  }
+});
+
+// POST /api/events - Create event
+router.post('/', authenticateToken, validateEvent, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { title, location, date } = req.body;
+
+    const event = await prisma.event.create({
+      data: {
+        title,
+        location,
+        date: new Date(date),
+        createdByUserId: req.user.id,
+      },
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    res.status(201).json({
+      ...event,
+      rsvps: { going: [], maybe: [], notGoing: [] },
+    });
+  } catch (error) {
+    console.error('Create event error:', error);
+    res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+// PUT /api/events/:id - Update event
+router.put('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { title, location, date } = req.body;
+
+    const event = await prisma.event.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        ...(title && { title }),
+        ...(location && { location }),
+        ...(date && { date: new Date(date) }),
+      },
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        rsvps: {
+          include: {
+            user: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+        },
+      },
+    });
+
+    const going = event.rsvps.filter((r) => r.status === 'going').map((r) => r.user);
+    const maybe = event.rsvps.filter((r) => r.status === 'maybe').map((r) => r.user);
+    const notGoing = event.rsvps.filter((r) => r.status === 'not-going').map((r) => r.user);
+
+    res.json({
+      ...event,
+      rsvps: { going, maybe, notGoing },
+    });
+  } catch (error) {
+    console.error('Update event error:', error);
+    res.status(500).json({ error: 'Failed to update event' });
+  }
+});
+
+// DELETE /api/events/:id - Delete event
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    await prisma.event.delete({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    res.json({ message: 'Event deleted successfully' });
+  } catch (error) {
+    console.error('Delete event error:', error);
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+// POST /api/events/:id/rsvp - RSVP to event
+router.post('/:id/rsvp', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!['going', 'maybe', 'not-going'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid RSVP status' });
+    }
+
+    const eventId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    // Upsert the RSVP
+    const rsvp = await prisma.eventRsvp.upsert({
+      where: {
+        eventId_userId: { eventId, userId },
+      },
+      update: { status },
+      create: { eventId, userId, status },
+      include: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    // Return updated event
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        rsvps: {
+          include: {
+            user: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+        },
+      },
+    });
+
+    const going = event.rsvps.filter((r) => r.status === 'going').map((r) => r.user);
+    const maybe = event.rsvps.filter((r) => r.status === 'maybe').map((r) => r.user);
+    const notGoing = event.rsvps.filter((r) => r.status === 'not-going').map((r) => r.user);
+
+    res.json({
+      ...event,
+      rsvps: { going, maybe, notGoing },
+    });
+  } catch (error) {
+    console.error('RSVP error:', error);
+    res.status(500).json({ error: 'Failed to RSVP' });
+  }
+});
+
+export default router;

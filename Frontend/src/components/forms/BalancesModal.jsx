@@ -1,9 +1,27 @@
 
 import { X } from 'lucide-react';
-import { allUsers } from '../../data/mockData';
+import { useState, useEffect } from 'react';
+import { usersApi } from '../../services/api';
 
 const BalancesModal = ({ onClose, balances }) => {
   const { debts, credits } = balances;
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await usersApi.getAll();
+        setUsers(data);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const getUserById = (userId) => {
+    return users.find(u => u.id === parseInt(userId)) || { name: 'Unknown', avatarUrl: '' };
+  };
 
   return (
     <div className="p-6">
@@ -17,11 +35,11 @@ const BalancesModal = ({ onClose, balances }) => {
           {Object.keys(debts).length > 0 ? (
             <ul className="divide-y dark:divide-gray-700">
               {Object.entries(debts).map(([userId, amount]) => {
-                const user = allUsers.find(u => u.id === parseInt(userId));
+                const user = getUserById(userId);
                 return (
                   <li key={userId} className="py-3 flex items-center justify-between">
                     <div className="flex items-center">
-                      <img src={user.avatarUrl} className="w-8 h-8 rounded-full mr-3"/>
+                      <img src={user.avatarUrl} className="w-8 h-8 rounded-full mr-3" alt={user.name}/>
                       <span>You owe <span className="font-bold">{user.name}</span></span>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -39,11 +57,11 @@ const BalancesModal = ({ onClose, balances }) => {
           {Object.keys(credits).length > 0 ? (
             <ul className="divide-y dark:divide-gray-700">
               {Object.entries(credits).map(([userId, amount]) => {
-                const user = allUsers.find(u => u.id === parseInt(userId));
+                const user = getUserById(userId);
                 return (
                   <li key={userId} className="py-3 flex items-center justify-between">
                     <div className="flex items-center">
-                      <img src={user.avatarUrl} className="w-8 h-8 rounded-full mr-3"/>
+                      <img src={user.avatarUrl} className="w-8 h-8 rounded-full mr-3" alt={user.name}/>
                       <span><span className="font-bold">{user.name}</span> owes you</span>
                     </div>
                     <div className="flex items-center space-x-3">

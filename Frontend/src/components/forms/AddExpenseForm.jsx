@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormInput from '../auth/FormInput';
-import { allUsers, mockUser } from '../../data/mockData';
+import { usersApi, expensesApi, getUser } from '../../services/api';
 
 const FormSelect = ({ label, children, error, ...props }) => (
   <div>
@@ -18,9 +18,28 @@ const FormSelect = ({ label, children, error, ...props }) => (
 );
 
 const AddExpenseForm = ({ onClose }) => {
-  const [formData, setFormData] = useState({ description: '', amount: '', paidBy: mockUser.name });
+  const [users, setUsers] = useState([]);
+  const currentUser = getUser();
+  const [formData, setFormData] = useState({ 
+    description: '', 
+    amount: '', 
+    paidByUserId: currentUser?.id || '' 
+  });
   const [errors, setErrors] = useState({});
   const [splitEqually, setSplitEqually] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await usersApi.getAll();
+        setUsers(data);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,13 +56,28 @@ const AddExpenseForm = ({ onClose }) => {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     setErrors(validationErrors);
+    
     if (Object.keys(validationErrors).length === 0) {
-      console.log("Expense added:", formData);
-      onClose();
+      setIsSubmitting(true);
+      try {
+        await expensesApi.create({
+          description: formData.description,
+          totalAmount: parseFloat(formData.amount),
+          paidByUserId: parseInt(formData.paidByUserId),
+          // If splitting equally, backend will handle it
+          // Otherwise, we could add custom split logic here
+        });
+        onClose();
+      } catch (error) {
+        console.error('Failed to add expense:', error);
+        setErrors({ submit: error.message });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -56,8 +90,8 @@ const AddExpenseForm = ({ onClose }) => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormInput label="Description" name="description" placeholder="e.g., Groceries, Rent" value={formData.description} onChange={handleChange} error={errors.description} />
         <FormInput label="Amount (₹)" name="amount" type="number" placeholder="0.00" value={formData.amount} onChange={handleChange} error={errors.amount} />
-        <FormSelect label="Paid By" name="paidBy" value={formData.paidBy} onChange={handleChange}>
-          {allUsers.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+        <FormSelect label="Paid By" name="paidByUserId" value={formData.paidByUserId} onChange={handleChange}>
+          {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </FormSelect>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Split</label>
@@ -66,9 +100,12 @@ const AddExpenseForm = ({ onClose }) => {
             <button type="button" onClick={() => setSplitEqually(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold w-full ${!splitEqually ? 'bg-teal-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>Unequally</button>
           </div>
         </div>
+        {errors.submit && <p className="text-red-500 text-sm">{errors.submit}</p>}
         <div className="flex justify-end space-x-3 pt-4">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
-          <button type="submit" className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700">Add Expense</button>
+          <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+            {isSubmitting ? 'Adding...' : 'Add Expense'}
+          </button>
         </div>
       </form>
     </div>

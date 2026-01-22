@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, Upload } from 'lucide-react';
 import FormInput from '../auth/FormInput';
+import { issuesApi } from '../../services/api';
 
 const FormTextArea = ({ label, placeholder, error, ...props }) => (
   <div>
@@ -19,6 +20,7 @@ const FormTextArea = ({ label, placeholder, error, ...props }) => (
 const ReportIssueForm = ({ onClose }) => {
   const [formData, setFormData] = useState({ title: '', description: '' });
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,13 +32,25 @@ const ReportIssueForm = ({ onClose }) => {
     return newErrors;
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     setErrors(validationErrors);
+    
     if (Object.keys(validationErrors).length === 0) {
-      console.log("Issue Reported:", formData);
-      onClose();
+      setIsSubmitting(true);
+      try {
+        await issuesApi.create({
+          title: formData.title,
+          description: formData.description,
+        });
+        onClose();
+      } catch (error) {
+        console.error('Failed to report issue:', error);
+        setErrors({ submit: error.message });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -65,9 +79,12 @@ const ReportIssueForm = ({ onClose }) => {
             </div>
           </div>
         </div>
+        {errors.submit && <p className="text-red-500 text-sm">{errors.submit}</p>}
         <div className="flex justify-end space-x-3 pt-4">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
-          <button type="submit" className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700">Submit Report</button>
+          <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+            {isSubmitting ? 'Submitting...' : 'Submit Report'}
+          </button>
         </div>
       </form>
     </div>
