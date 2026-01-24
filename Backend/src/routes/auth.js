@@ -123,7 +123,7 @@ router.post('/login', validateLogin, async (req, res) => {
   }
 });
 
-// POST /api/auth/google - Google OAuth (simplified)
+// POST /api/auth/google - Google OAuth
 router.post('/google', async (req, res) => {
   try {
     const { email, name, avatarUrl } = req.body;
