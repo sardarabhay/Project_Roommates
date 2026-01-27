@@ -11,10 +11,9 @@ const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout }) => 
 
   return (
     <header className="flex-shrink-0 flex items-center justify-between p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 relative">
-      <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-        <Menu className="w-6 h-6" />
-      </button>
-      <div className="relative w-full max-w-xs hidden sm:block">
+      {/* App title on mobile, hidden on desktop */}
+      <h1 className="text-lg font-bold text-teal-700 dark:text-teal-400 lg:hidden">HarmonyHomes</h1>
+      <div className="relative w-full max-w-xs hidden lg:block">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input
           type="text"
