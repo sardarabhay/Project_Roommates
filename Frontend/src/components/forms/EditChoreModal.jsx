@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormInput from '../auth/FormInput';
@@ -17,16 +16,17 @@ const FormSelect = ({ label, children, error, ...props }) => (
   </div>
 );
 
-const AddTaskForm = ({ onClose }) => {
+const EditChoreModal = ({ chore, onClose, onUpdate }) => {
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    assignedToUserId: '',
-    points: '',
-    dueDate: '',
-    isRecurring: false,
-    recurringPattern: ''
+    title: chore.title || '',
+    description: chore.description || '',
+    assignedToUserId: chore.assignedToUserId || '',
+    points: chore.points || '',
+    dueDate: chore.dueDate ? new Date(chore.dueDate).toISOString().split('T')[0] : '',
+    status: chore.status || 'todo',
+    isRecurring: chore.isRecurring || false,
+    recurringPattern: chore.recurringPattern || ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,18 +64,20 @@ const AddTaskForm = ({ onClose }) => {
     if (Object.keys(validationErrors).length === 0) {
       setIsSubmitting(true);
       try {
-        await choresApi.create({
+        await choresApi.update(chore.id, {
           title: formData.title,
           description: formData.description || null,
           assignedToUserId: formData.assignedToUserId ? parseInt(formData.assignedToUserId) : null,
           points: formData.points ? parseInt(formData.points) : 0,
           dueDate: formData.dueDate || null,
+          status: formData.status,
           isRecurring: formData.isRecurring,
           recurringPattern: formData.isRecurring ? formData.recurringPattern : null,
         });
+        onUpdate();
         onClose();
       } catch (error) {
-        console.error('Failed to add task:', error);
+        console.error('Failed to update task:', error);
         setErrors({ submit: error.message });
       } finally {
         setIsSubmitting(false);
@@ -86,11 +88,18 @@ const AddTaskForm = ({ onClose }) => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold">Add New Task</h3>
+        <h3 className="text-xl font-bold">Edit Task</h3>
         <button onClick={onClose}><X className="w-6 h-6 text-gray-500" /></button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <FormInput label="Task Title" name="title" placeholder="e.g., Clean the living room" value={formData.title} onChange={handleChange} error={errors.title} />
+        <FormInput
+          label="Task Title"
+          name="title"
+          placeholder="e.g., Clean the living room"
+          value={formData.title}
+          onChange={handleChange}
+          error={errors.title}
+        />
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
           <textarea
@@ -106,8 +115,27 @@ const AddTaskForm = ({ onClose }) => {
           <option value="">Unassigned</option>
           {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </FormSelect>
-        <FormInput label="Points" name="points" type="number" placeholder="e.g., 10" value={formData.points} onChange={handleChange} />
-        <FormInput label="Due Date" name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} error={errors.dueDate} />
+        <FormSelect label="Status" name="status" value={formData.status} onChange={handleChange}>
+          <option value="todo">To Do</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Done</option>
+        </FormSelect>
+        <FormInput
+          label="Points"
+          name="points"
+          type="number"
+          placeholder="e.g., 10"
+          value={formData.points}
+          onChange={handleChange}
+        />
+        <FormInput
+          label="Due Date"
+          name="dueDate"
+          type="date"
+          value={formData.dueDate}
+          onChange={handleChange}
+          error={errors.dueDate}
+        />
 
         <div className="flex items-center space-x-2">
           <input
@@ -134,9 +162,19 @@ const AddTaskForm = ({ onClose }) => {
 
         {errors.submit && <p className="text-red-500 text-sm">{errors.submit}</p>}
         <div className="flex justify-end space-x-3 pt-4">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
-          <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
-            {isSubmitting ? 'Adding...' : 'Add Task'}
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Updating...' : 'Update Task'}
           </button>
         </div>
       </form>
@@ -144,4 +182,4 @@ const AddTaskForm = ({ onClose }) => {
   );
 };
 
-export default AddTaskForm;
+export default EditChoreModal;

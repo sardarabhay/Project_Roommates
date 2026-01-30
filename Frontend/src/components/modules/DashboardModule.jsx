@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Card from '../common/Card';
 import ModuleHeader from '../common/ModuleHeader';
+import Leaderboard from '../dashboard/Leaderboard';
 import { dashboardApi, usersApi } from '../../services/api';
 
 const DashboardModule = ({ setActiveModule, balances, user }) => {
@@ -121,6 +122,8 @@ const DashboardModule = ({ setActiveModule, balances, user }) => {
           )}
         </ul>
       </Card>
+
+      <Leaderboard leaderboard={dashboard?.leaderboard} />
     </div>
   );
 };

@@ -91,6 +91,33 @@ router.get('/', authenticateToken, async (req, res) => {
       select: { id: true, name: true, avatarUrl: true },
     });
 
+    // Get leaderboard data
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, avatarUrl: true },
+    });
+
+    const leaderboard = await Promise.all(
+      users.map(async (user) => {
+        const completedChores = await prisma.chore.findMany({
+          where: {
+            assignedToUserId: user.id,
+            status: 'done',
+          },
+        });
+
+        const totalPoints = completedChores.reduce((sum, chore) => sum + chore.points, 0);
+        const completedCount = completedChores.length;
+
+        return {
+          ...user,
+          totalPoints,
+          completedCount,
+        };
+      })
+    );
+
+    leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
+
     res.json({
       financial: {
         youOwe,
@@ -103,6 +130,7 @@ router.get('/', authenticateToken, async (req, res) => {
         chores: recentChores,
       },
       roommates,
+      leaderboard,
     });
   } catch (error) {
     console.error('Get dashboard error:', error);

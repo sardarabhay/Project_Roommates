@@ -21,6 +21,7 @@ model User {
   createdExpenses Expense[]      @relation("CreatedByUser")
   owedSplits      ExpenseSplit[] @relation("OwedByUser")
   assignedChores  Chore[]        @relation("AssignedToUser")
+  createdChores   Chore[]        @relation("ChoreCreatedBy")
   createdEvents   Event[]        @relation("CreatedByUser")
   eventRsvps      EventRsvp[]
   reportedIssues  Issue[]        @relation("ReportedByUser")
@@ -62,17 +63,24 @@ model ExpenseSplit {
 }
 
 model Chore {
-  id        Int       @id @default(autoincrement())
-  title     String
-  points    Int       @default(0)
-  status    String    @default("todo") // todo, in_progress, done
-  dueDate   DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id               Int       @id @default(autoincrement())
+  title            String
+  description      String?
+  points           Int       @default(0)
+  status           String    @default("todo") // todo, in_progress, done
+  dueDate          DateTime?
+  isRecurring      Boolean   @default(false)
+  recurringPattern String?   // daily, weekly, monthly
+  isArchived       Boolean   @default(false)
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
   assignedToUserId Int?
-  assignedToUser   User? @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
+  assignedToUser   User?     @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
+  createdByUserId  Int?
+  createdByUser    User?     @relation("ChoreCreatedBy", fields: [createdByUserId], references: [id])
 }
 
 model Event {
