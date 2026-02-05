@@ -10,6 +10,7 @@ import type { User, Chore, ChoreTask, ChoresGrouped } from '../../types';
 interface ChoresModuleProps {
   onAddTask: () => void;
   user: User | null;
+  refreshKey?: number;
 }
 
 interface ChoreFilters {
@@ -17,7 +18,7 @@ interface ChoreFilters {
   showRecurring: string;
 }
 
-const ChoresModule = ({ onAddTask, user }: ChoresModuleProps): JSX.Element => {
+const ChoresModule = ({ onAddTask, user, refreshKey }: ChoresModuleProps): JSX.Element => {
   const [chores, setChores] = useState<ChoresGrouped>({ todo: [], in_progress: [], done: [] });
   const [loading, setLoading] = useState<boolean>(true);
   const [editingChore, setEditingChore] = useState<ChoreTask | null>(null);
@@ -29,7 +30,7 @@ const ChoresModule = ({ onAddTask, user }: ChoresModuleProps): JSX.Element => {
 
   useEffect(() => {
     fetchChores();
-  }, []);
+  }, [refreshKey]);
 
   const fetchChores = async (): Promise<void> => {
     try {

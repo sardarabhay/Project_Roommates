@@ -66,12 +66,13 @@ router.post('/', authenticateToken, validateIssue, async (req: Request, res: Res
       return;
     }
 
-    const { title, description } = req.body as { title: string; description?: string };
+    const { title, description, priority } = req.body as { title: string; description?: string; priority?: string };
 
     const issue = await prisma.issue.create({
       data: {
         title,
         description,
+        priority: priority || 'Medium',
         reportedByUserId: userId,
         householdId: currentUser.householdId,
       },
@@ -92,10 +93,11 @@ router.post('/', authenticateToken, validateIssue, async (req: Request, res: Res
 // PUT /api/issues/:id - Update issue
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, status } = req.body as { 
-      title?: string; 
-      description?: string; 
-      status?: string 
+    const { title, description, status, priority } = req.body as {
+      title?: string;
+      description?: string;
+      status?: string;
+      priority?: string;
     };
 
     const issue = await prisma.issue.update({
@@ -104,6 +106,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
         ...(title && { title }),
         ...(description !== undefined && { description }),
         ...(status && { status }),
+        ...(priority && { priority }),
       },
       include: {
         reportedByUser: {

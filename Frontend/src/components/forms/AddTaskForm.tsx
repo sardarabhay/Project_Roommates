@@ -25,6 +25,7 @@ const FormSelect = ({ label, children, error, ...props }: FormSelectProps): JSX.
 
 interface AddTaskFormProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 interface TaskFormData {
@@ -43,7 +44,7 @@ interface FormErrors {
   submit?: string;
 }
 
-const AddTaskForm = ({ onClose }: AddTaskFormProps): JSX.Element => {
+const AddTaskForm = ({ onClose, onSuccess }: AddTaskFormProps): JSX.Element => {
   const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
@@ -99,6 +100,7 @@ const AddTaskForm = ({ onClose }: AddTaskFormProps): JSX.Element => {
           isRecurring: formData.isRecurring,
           recurringPattern: formData.isRecurring ? formData.recurringPattern : undefined,
         });
+        if (onSuccess) onSuccess();
         onClose();
       } catch (error) {
         const err = error as Error;

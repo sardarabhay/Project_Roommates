@@ -29,6 +29,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
         name: true,
         email: true,
         avatarUrl: true,
+        householdId: true,
         role: true,
       },
       orderBy: { name: 'asc' },

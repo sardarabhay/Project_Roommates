@@ -8,17 +8,18 @@ import type { User, HouseEvent } from '../../types';
 interface EventsModuleProps {
   onCreateEvent: () => void;
   user: User | null;
+  refreshKey?: number;
 }
 
 type RSVPStatus = 'going' | 'maybe' | 'not-going';
 
-const EventsModule = ({ onCreateEvent, user }: EventsModuleProps): JSX.Element => {
+const EventsModule = ({ onCreateEvent, user, refreshKey }: EventsModuleProps): JSX.Element => {
   const [events, setEvents] = useState<HouseEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [refreshKey]);
 
   const fetchEvents = async (): Promise<void> => {
     try {

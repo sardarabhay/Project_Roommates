@@ -123,8 +123,10 @@ export interface Issue {
   title: string;
   description: string | null;
   status: 'Reported' | 'In Progress' | 'Resolved';
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   reportedByUser: User;
   createdAt: string;
+  updatedAt: string;
 }
 
 // Landlord types
@@ -145,6 +147,7 @@ export interface HouseRule {
 export interface BulletinPost {
   id: number;
   content: string;
+  postedByUserId: number;
   postedByUser: User;
   createdAt: string;
 }

@@ -1,12 +1,14 @@
-import { Plus, Upload, FileText, Edit, Trash2, Download } from 'lucide-react';
+import { Plus, Upload, FileText, Edit, Trash2, Download, AlertCircle, Clock, Filter } from 'lucide-react';
 import Card from '../common/Card';
 import ModuleHeader from '../common/ModuleHeader';
 import { useState, useEffect, ChangeEvent } from 'react';
 import { landlordApi, issuesApi, documentsApi } from '../../services/api';
+import EditLandlordModal from '../forms/EditLandlordModal';
 import type { Landlord, Issue, Document } from '../../types';
 
 interface LandlordModuleProps {
   onReportIssue: () => void;
+  refreshKey?: number;
 }
 
 interface NewDocument {
@@ -14,17 +16,20 @@ interface NewDocument {
   file: File | null;
 }
 
-const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => {
+const LandlordModule = ({ onReportIssue, refreshKey }: LandlordModuleProps): JSX.Element => {
   const [landlord, setLandlord] = useState<Landlord | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
+  const [showEditLandlordModal, setShowEditLandlordModal] = useState<boolean>(false);
   const [newDocument, setNewDocument] = useState<NewDocument>({ name: '', file: null });
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [refreshKey]);
 
   const fetchData = async (): Promise<void> => {
     try {
@@ -71,11 +76,47 @@ const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => 
   const handleUpdateIssueStatus = async (issueId: number, newStatus: string): Promise<void> => {
     try {
       await issuesApi.updateStatus(issueId, newStatus);
-      setIssues(issues.map(issue => 
+      setIssues(issues.map(issue =>
         issue.id === issueId ? { ...issue, status: newStatus as Issue['status'] } : issue
       ));
     } catch (error) {
       console.error('Failed to update issue status:', error);
+    }
+  };
+
+  const handleSaveLandlord = async (data: { name: string; phone?: string; email?: string }): Promise<void> => {
+    try {
+      await landlordApi.save(data);
+      fetchData(); // Refresh landlord info
+      setShowEditLandlordModal(false);
+    } catch (error) {
+      console.error('Failed to save landlord:', error);
+    }
+  };
+
+  const filterIssues = (): Issue[] => {
+    let filtered = [...issues];
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(issue => issue.status === statusFilter);
+    }
+
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(issue => issue.priority === priorityFilter);
+    }
+
+    return filtered;
+  };
+
+  const filteredIssues = filterIssues();
+
+  const getPriorityColor = (priority: string): string => {
+    switch (priority) {
+      case 'Urgent': return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border-red-200';
+      case 'High': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300 border-orange-200';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200';
+      case 'Low': return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200';
     }
   };
 
@@ -110,7 +151,16 @@ const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => 
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-1">
-          <h3 className="font-bold text-lg mb-4">Landlord Info</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-lg">Landlord Info</h3>
+            <button
+              onClick={() => setShowEditLandlordModal(true)}
+              className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+              title="Edit landlord info"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+          </div>
           {landlord ? (
             <>
               <p className="font-semibold text-xl">{landlord.name}</p>
@@ -118,7 +168,15 @@ const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => 
               <p className="text-gray-600 dark:text-gray-300">{landlord.email}</p>
             </>
           ) : (
-            <p className="text-gray-500">No landlord info available</p>
+            <div>
+              <p className="text-gray-500 mb-3">No landlord info available</p>
+              <button
+                onClick={() => setShowEditLandlordModal(true)}
+                className="text-sm text-teal-600 dark:text-teal-400 font-semibold hover:text-teal-700"
+              >
+                Add Landlord Info
+              </button>
+            </div>
           )}
         </Card>
         
@@ -126,40 +184,93 @@ const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => 
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-lg">Reported Issues</h3>
           </div>
-          {issues.length === 0 ? (
-            <p className="text-gray-500">No issues reported</p>
+
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1 text-sm rounded-lg border bg-white dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">All</option>
+                <option value="Reported">Reported</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Priority:</span>
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="px-3 py-1 text-sm rounded-lg border bg-white dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">All</option>
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          {filteredIssues.length === 0 ? (
+            <p className="text-gray-500">
+              {issues.length === 0 ? 'No issues reported' : 'No issues match your filters'}
+            </p>
           ) : (
             <ul className="divide-y dark:divide-gray-700">
-              {issues.map(issue => (
-                <li key={issue.id} className="py-3 flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-semibold">{issue.title}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Reported by {issue.reportedByUser?.name}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <select 
-                      value={issue.status}
-                      onChange={(e) => handleUpdateIssueStatus(issue.id, e.target.value)}
-                      className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                        issue.status === 'Resolved' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200' 
-                          : issue.status === 'In Progress'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200'
-                      }`}
-                    >
-                      <option value="Reported">Reported</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Resolved">Resolved</option>
-                    </select>
-                    <button 
-                      onClick={() => handleDeleteIssue(issue.id)}
-                      className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              {filteredIssues.map(issue => (
+                <li key={issue.id} className="py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-semibold">{issue.title}</p>
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${getPriorityColor(issue.priority)}`}>
+                          {issue.priority}
+                        </span>
+                      </div>
+                      {issue.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{issue.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {issue.reportedByUser?.name}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(issue.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <select
+                        value={issue.status}
+                        onChange={(e) => handleUpdateIssueStatus(issue.id, e.target.value)}
+                        className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                          issue.status === 'Resolved'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200'
+                            : issue.status === 'In Progress'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200'
+                        }`}
+                      >
+                        <option value="Reported">Reported</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Resolved">Resolved</option>
+                      </select>
+                      <button
+                        onClick={() => handleDeleteIssue(issue.id)}
+                        className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -280,6 +391,14 @@ const LandlordModule = ({ onReportIssue }: LandlordModuleProps): JSX.Element => 
           </div>
         </div>
       )}
+
+      {/* Edit Landlord Modal */}
+      <EditLandlordModal
+        isOpen={showEditLandlordModal}
+        onClose={() => setShowEditLandlordModal(false)}
+        onSave={handleSaveLandlord}
+        landlord={landlord}
+      />
     </div>
   );
 };

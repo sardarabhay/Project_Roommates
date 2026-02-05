@@ -1,13 +1,6 @@
 import { ArrowRightCircle, CheckCircle, User as UserIcon, Edit2, Trash2, Calendar, AlertCircle, Repeat } from 'lucide-react';
 import Card from '../common/Card';
-import { allUsers } from '../../data/mockData';
 import type { User, ChoreTask } from '../../types';
-
-interface MockUser {
-  id: number;
-  name: string;
-  avatarUrl: string;
-}
 
 interface ChoreCardProps {
   task: ChoreTask;
@@ -93,7 +86,7 @@ const ChoreCard = ({ task, onUpdateStatus, onClaimTask, onEdit, onDelete, curren
     return null;
   };
 
-  const assignee = allUsers.find((u: MockUser) => u.name === task.assignedTo);
+  const assignee = task.assignedToUser;
 
   return (
     <Card className={`!p-4 ${dueDateInfo ? `border-l-4 ${dueDateInfo.status === 'overdue' ? 'border-red-500' : dueDateInfo.status === 'today' ? 'border-orange-500' : dueDateInfo.status === 'soon' ? 'border-yellow-500' : ''}` : ''}`}>
@@ -152,7 +145,13 @@ const ChoreCard = ({ task, onUpdateStatus, onClaimTask, onEdit, onDelete, curren
         <div className="flex items-center">
           {assignee ? (
             <>
-              <img src={assignee.avatarUrl} className="w-6 h-6 rounded-full mr-2" />
+              {assignee.avatarUrl ? (
+                <img src={assignee.avatarUrl} className="w-6 h-6 rounded-full mr-2" />
+              ) : (
+                <div className="w-6 h-6 rounded-full mr-2 bg-teal-500 flex items-center justify-center text-white text-xs font-semibold">
+                  {assignee.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span className="text-sm">{assignee.name}</span>
             </>
           ) : (

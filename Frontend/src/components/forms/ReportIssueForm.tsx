@@ -23,6 +23,7 @@ const FormTextArea = ({ label, placeholder, error, ...props }: FormTextAreaProps
 
 interface ReportIssueFormProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 interface IssueFormData {
@@ -35,7 +36,7 @@ interface FormErrors {
   submit?: string;
 }
 
-const ReportIssueForm = ({ onClose }: ReportIssueFormProps): JSX.Element => {
+const ReportIssueForm = ({ onClose, onSuccess }: ReportIssueFormProps): JSX.Element => {
   const [formData, setFormData] = useState<IssueFormData>({ title: '', description: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -62,6 +63,7 @@ const ReportIssueForm = ({ onClose }: ReportIssueFormProps): JSX.Element => {
           title: formData.title,
           description: formData.description,
         });
+        if (onSuccess) onSuccess();
         onClose();
       } catch (error) {
         const err = error as Error;

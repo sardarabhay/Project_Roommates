@@ -5,6 +5,7 @@ import { eventsApi } from '../../services/api';
 
 interface CreateEventFormProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 interface EventFormData {
@@ -20,7 +21,7 @@ interface FormErrors {
   submit?: string;
 }
 
-const CreateEventForm = ({ onClose }: CreateEventFormProps): JSX.Element => {
+const CreateEventForm = ({ onClose, onSuccess }: CreateEventFormProps): JSX.Element => {
   const [formData, setFormData] = useState<EventFormData>({ title: '', location: '', dateTime: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -54,6 +55,7 @@ const CreateEventForm = ({ onClose }: CreateEventFormProps): JSX.Element => {
           location: formData.location,
           date: formData.dateTime,
         });
+        if (onSuccess) onSuccess();
         onClose();
       } catch (error) {
         const err = error as Error;

@@ -39,6 +39,18 @@ export default function App(): JSX.Element {
     setRefreshKey(k => k + 1);
   };
 
+  const handleChoreAdded = (): void => {
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleEventCreated = (): void => {
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleIssueReported = (): void => {
+    setRefreshKey(k => k + 1);
+  };
+
   // Check for existing auth on mount
   useEffect(() => {
     const checkAuth = async (): Promise<void> => {
@@ -120,10 +132,10 @@ export default function App(): JSX.Element {
     switch (activeModule) {
       case 'dashboard': return <DashboardModule setActiveModule={setActiveModule} balances={balances} user={currentUser} />;
       case 'finance': return <FinanceModule onAddExpense={() => openModal('addExpense')} onSettleUp={() => openModal('settleUp')} balances={balances} refreshKey={refreshKey} onEditExpense={handleEditExpense} />;
-      case 'chores': return <ChoresModule onAddTask={() => openModal('addTask')} user={currentUser} />;
-      case 'communication': return <CommunicationModule />;
-      case 'landlord': return <LandlordModule onReportIssue={() => openModal('reportIssue')} />;
-      case 'events': return <EventsModule onCreateEvent={() => openModal('createEvent')} user={currentUser} />;
+      case 'chores': return <ChoresModule onAddTask={() => openModal('addTask')} user={currentUser} refreshKey={refreshKey} />;
+      case 'communication': return <CommunicationModule user={currentUser} />;
+      case 'landlord': return <LandlordModule onReportIssue={() => openModal('reportIssue')} refreshKey={refreshKey} />;
+      case 'events': return <EventsModule onCreateEvent={() => openModal('createEvent')} user={currentUser} refreshKey={refreshKey} />;
       default: return <DashboardModule setActiveModule={setActiveModule} balances={balances} user={currentUser} />;
     }
   };
@@ -132,9 +144,9 @@ export default function App(): JSX.Element {
     switch (activeModal) {
       case 'addExpense': return <AddExpenseForm onClose={closeModal} onSuccess={handleExpenseAdded} />;
       case 'editExpense': return selectedExpense ? <EditExpenseModal expense={selectedExpense} onClose={closeModal} onSuccess={handleExpenseAdded} /> : null;
-      case 'addTask': return <AddTaskForm onClose={closeModal} />;
-      case 'reportIssue': return <ReportIssueForm onClose={closeModal} />;
-      case 'createEvent': return <CreateEventForm onClose={closeModal} />;
+      case 'addTask': return <AddTaskForm onClose={closeModal} onSuccess={handleChoreAdded} />;
+      case 'reportIssue': return <ReportIssueForm onClose={closeModal} onSuccess={handleIssueReported} />;
+      case 'createEvent': return <CreateEventForm onClose={closeModal} onSuccess={handleEventCreated} />;
       case 'settleUp': return <BalancesModal onClose={closeModal} balances={balances} onSettle={handleExpenseAdded} />;
       case 'householdSettings': return <HouseholdSettings onClose={closeModal} currentUser={currentUser} />;
       default: return null;
