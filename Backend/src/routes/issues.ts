@@ -14,7 +14,21 @@ const validateIssue: ValidationChain[] = [
 // GET /api/issues - Get all issues
 router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to view issues' });
+      return;
+    }
+
     const issues = await prisma.issue.findMany({
+      where: { householdId: currentUser.householdId },
       include: {
         reportedByUser: {
           select: { id: true, name: true, avatarUrl: true },
@@ -39,13 +53,27 @@ router.post('/', authenticateToken, validateIssue, async (req: Request, res: Res
       return;
     }
 
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to report issues' });
+      return;
+    }
+
     const { title, description } = req.body as { title: string; description?: string };
 
     const issue = await prisma.issue.create({
       data: {
         title,
         description,
-        reportedByUserId: req.user!.id,
+        reportedByUserId: userId,
+        householdId: currentUser.householdId,
       },
       include: {
         reportedByUser: {

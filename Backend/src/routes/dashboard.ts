@@ -10,9 +10,25 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
   try {
     const userId = req.user!.id;
 
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to view dashboard' });
+      return;
+    }
+
+    const householdId = currentUser.householdId;
+
     // Get financial summary
     const splits = await prisma.expenseSplit.findMany({
-      where: { status: 'pending' },
+      where: { 
+        status: 'pending',
+        expense: { householdId },
+      },
       include: {
         expense: true,
       },
@@ -33,6 +49,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
     // Get user's next chore
     const nextChore = await prisma.chore.findFirst({
       where: {
+        householdId,
         OR: [{ assignedToUserId: userId }, { assignedToUserId: null }],
         status: { in: ['todo', 'in_progress'] },
       },
@@ -47,6 +64,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
     // Get upcoming event
     const upcomingEvent = await prisma.event.findFirst({
       where: {
+        householdId,
         date: { gte: new Date() },
       },
       include: {
@@ -59,6 +77,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
 
     // Get recent activity (recent expenses)
     const recentExpenses = await prisma.expense.findMany({
+      where: { householdId },
       take: 5,
       include: {
         paidByUser: {
@@ -70,7 +89,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
 
     // Get recent completed chores
     const recentChores = await prisma.chore.findMany({
-      where: { status: 'done' },
+      where: { householdId, status: 'done' },
       take: 5,
       include: {
         assignedToUser: {
@@ -80,14 +99,15 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
       orderBy: { updatedAt: 'desc' },
     });
 
-    // Get all roommates
+    // Get all roommates in same household
     const roommates = await prisma.user.findMany({
-      where: { id: { not: userId } },
+      where: { householdId, id: { not: userId } },
       select: { id: true, name: true, avatarUrl: true },
     });
 
-    // Get leaderboard data
+    // Get leaderboard data for household
     const users = await prisma.user.findMany({
+      where: { householdId },
       select: { id: true, name: true, avatarUrl: true },
     });
 
@@ -95,6 +115,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
       users.map(async (user) => {
         const completedChores = await prisma.chore.findMany({
           where: {
+            householdId,
             assignedToUserId: user.id,
             status: 'done',
           },

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import AuthPage from './components/auth/AuthPage';
 import SuccessMessage from './components/auth/SuccessMessage';
+import HouseholdSetup from './components/household/HouseholdSetup';
+import HouseholdSettings from './components/household/HouseholdSettings';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import Modal from './components/common/Modal';
@@ -17,7 +19,7 @@ import CreateEventForm from './components/forms/CreateEventForm';
 import BalancesModal from './components/forms/BalancesModal';
 import EditExpenseModal from './components/forms/EditExpenseModal';
 import { useBalances } from './hooks/useBalances';
-import { getUser, clearAuth, authApi } from './services/api';
+import { getUser, clearAuth, authApi, setUser } from './services/api';
 import type { User, ModuleType, ModalType, AuthState, Expense } from './types';
 
 export default function App(): JSX.Element {
@@ -46,7 +48,12 @@ export default function App(): JSX.Element {
           // Verify token is still valid
           const user = await authApi.getCurrentUser();
           setCurrentUser(user);
-          setAuthState('logged-in');
+          // Check if user has a household
+          if (!user.householdId) {
+            setAuthState('needs-household');
+          } else {
+            setAuthState('logged-in');
+          }
         } catch {
           // Token invalid, clear and show login
           clearAuth();
@@ -61,6 +68,19 @@ export default function App(): JSX.Element {
 
   const handleLogin = (): void => {
     const user = getUser();
+    setCurrentUser(user);
+    // Check if user has a household
+    if (!user?.householdId) {
+      setAuthState('needs-household');
+    } else {
+      setAuthState('logged-in');
+    }
+  };
+
+  const handleHouseholdComplete = async (): Promise<void> => {
+    // Refresh user data after household creation/join
+    const user = await authApi.getCurrentUser();
+    setUser(user); // Update localStorage
     setCurrentUser(user);
     setAuthState('logged-in');
   };
@@ -116,6 +136,7 @@ export default function App(): JSX.Element {
       case 'reportIssue': return <ReportIssueForm onClose={closeModal} />;
       case 'createEvent': return <CreateEventForm onClose={closeModal} />;
       case 'settleUp': return <BalancesModal onClose={closeModal} balances={balances} onSettle={handleExpenseAdded} />;
+      case 'householdSettings': return <HouseholdSettings onClose={closeModal} currentUser={currentUser} />;
       default: return null;
     }
   };
@@ -140,8 +161,12 @@ export default function App(): JSX.Element {
     return <SuccessMessage onContinue={handleContinueToLogin} />;
   }
 
+  if (authState === 'needs-household') {
+    return <HouseholdSetup onComplete={handleHouseholdComplete} />;
+  }
+
   // Create user object for header (use currentUser from API)
-  const user: User = currentUser || { id: 0, name: 'User', email: '', avatarUrl: 'https://placehold.co/100x100/A8D5BA/004643?text=U' };
+  const user: User = currentUser || { id: 0, name: 'User', email: '', avatarUrl: 'https://placehold.co/100x100/A8D5BA/004643?text=U', householdId: null, role: null };
 
   return (
     <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50'}`}>
@@ -153,6 +178,7 @@ export default function App(): JSX.Element {
           toggleTheme={toggleTheme} 
           isDarkMode={isDarkMode} 
           onLogout={handleLogout}
+          onHouseholdSettings={() => openModal('householdSettings')}
         />
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
           {renderModule()}

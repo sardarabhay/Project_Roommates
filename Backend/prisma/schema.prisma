@@ -7,26 +7,86 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Household {
+  id         Int      @id @default(autoincrement())
+  name       String
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  createdByUserId  Int
+  members          User[]
+  expenses         Expense[]
+  chores           Chore[]
+  events           Event[]
+  issues           Issue[]
+  documents        Document[]
+  landlords        Landlord[]
+  houseRules       HouseRule[]
+  bulletinPosts    BulletinPost[]
+  removalRequests  RemovalRequest[]
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   name      String
   email     String   @unique
   password  String?
   avatarUrl String?
+  role      String   @default("member") // admin, member
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
+
   // Relations
-  paidExpenses    Expense[]      @relation("PaidByUser")
-  createdExpenses Expense[]      @relation("CreatedByUser")
-  owedSplits      ExpenseSplit[] @relation("OwedByUser")
-  assignedChores  Chore[]        @relation("AssignedToUser")
-  createdChores   Chore[]        @relation("ChoreCreatedBy")
-  createdEvents   Event[]        @relation("CreatedByUser")
-  eventRsvps      EventRsvp[]
-  reportedIssues  Issue[]        @relation("ReportedByUser")
-  uploadedDocs    Document[]     @relation("UploadedByUser")
-  bulletinPosts   BulletinPost[] @relation("PostedByUser")
+  paidExpenses       Expense[]        @relation("PaidByUser")
+  createdExpenses    Expense[]        @relation("CreatedByUser")
+  owedSplits         ExpenseSplit[]   @relation("OwedByUser")
+  assignedChores     Chore[]          @relation("AssignedToUser")
+  createdChores      Chore[]          @relation("ChoreCreatedBy")
+  createdEvents      Event[]          @relation("CreatedByUser")
+  eventRsvps         EventRsvp[]
+  reportedIssues     Issue[]          @relation("ReportedByUser")
+  uploadedDocs       Document[]       @relation("UploadedByUser")
+  bulletinPosts      BulletinPost[]   @relation("PostedByUser")
+  removalRequests    RemovalRequest[] @relation("TargetUser")
+  requestedRemovals  RemovalRequest[] @relation("RequestedByUser")
+  removalVotes       RemovalVote[]
+}
+
+model RemovalRequest {
+  id          Int      @id @default(autoincrement())
+  status      String   @default("pending") // pending, approved, rejected
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  householdId     Int
+  household       Household     @relation(fields: [householdId], references: [id])
+  targetUserId    Int
+  targetUser      User          @relation("TargetUser", fields: [targetUserId], references: [id])
+  requestedByUserId Int
+  requestedByUser User          @relation("RequestedByUser", fields: [requestedByUserId], references: [id])
+  votes           RemovalVote[]
+}
+
+model RemovalVote {
+  id        Int      @id @default(autoincrement())
+  vote      String   // approve, reject
+  createdAt DateTime @default(now())
+
+  // Relations
+  removalRequestId Int
+  removalRequest   RemovalRequest @relation(fields: [removalRequestId], references: [id], onDelete: Cascade)
+  userId           Int
+  user             User           @relation(fields: [userId], references: [id])
+
+  @@unique([removalRequestId, userId])
 }
 
 model Expense {
@@ -37,6 +97,10 @@ model Expense {
   date        DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
 
   // Relations
   paidByUserId    Int
@@ -76,6 +140,10 @@ model Chore {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
+
   // Relations
   assignedToUserId Int?
   assignedToUser   User?     @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
@@ -90,6 +158,10 @@ model Event {
   location  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
 
   // Relations
   createdByUserId Int
@@ -120,6 +192,10 @@ model Issue {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
+
   // Relations
   reportedByUserId Int
   reportedByUser   User @relation("ReportedByUser", fields: [reportedByUserId], references: [id])
@@ -133,6 +209,10 @@ model Document {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
+
   // Relations
   uploadedByUserId Int
   uploadedByUser   User @relation("UploadedByUser", fields: [uploadedByUserId], references: [id])
@@ -145,6 +225,10 @@ model Landlord {
   email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
 }
 
 model HouseRule {
@@ -153,6 +237,10 @@ model HouseRule {
   orderNum  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
 }
 
 model BulletinPost {
@@ -160,6 +248,10 @@ model BulletinPost {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Household relation
+  householdId Int?
+  household   Household? @relation(fields: [householdId], references: [id])
 
   // Relations
   postedByUserId Int

@@ -124,6 +124,8 @@ router.post('/login', validateLogin, async (req: Request, res: Response): Promis
         name: user.name,
         email: user.email,
         avatarUrl: user.avatarUrl,
+        householdId: user.householdId,
+        role: user.role,
       },
       token,
     });
@@ -166,6 +168,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         email: user.email,
         avatarUrl: user.avatarUrl,
+        householdId: user.householdId,
+        role: user.role,
       },
       token,
     });
@@ -185,6 +189,8 @@ router.get('/me', authenticateToken, async (req: Request, res: Response): Promis
         name: true,
         email: true,
         avatarUrl: true,
+        householdId: true,
+        role: true,
         createdAt: true,
       },
     });

@@ -11,7 +11,9 @@ import type {
   BulletinPost, 
   Document as HouseDocument,
   DashboardData,
-  AuthResponse 
+  AuthResponse,
+  Household,
+  RemovalRequest
 } from '../types';
 
 // API Configuration
@@ -116,6 +118,66 @@ export const authApi = {
 
   logout: (): void => {
     clearAuth();
+  },
+};
+
+// === HOUSEHOLDS API ===
+export const householdsApi = {
+  getCurrent: async (): Promise<Household | null> => {
+    try {
+      const data = await fetchWithAuth<{ household: Household | null }>('/households/current');
+      return data.household;
+    } catch {
+      return null;
+    }
+  },
+
+  create: async (name: string): Promise<Household> => {
+    const data = await fetchWithAuth<{ household: Household; message: string }>('/households', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    return data.household;
+  },
+
+  join: async (inviteCode: string): Promise<Household> => {
+    const data = await fetchWithAuth<{ household: Household; message: string }>('/households/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+    return data.household;
+  },
+
+  leave: async (): Promise<void> => {
+    await fetchWithAuth<{ message: string }>('/households/leave', {
+      method: 'POST',
+    });
+  },
+
+  regenerateCode: async (): Promise<string> => {
+    const data = await fetchWithAuth<{ inviteCode: string }>('/households/regenerate-code', {
+      method: 'POST',
+    });
+    return data.inviteCode;
+  },
+
+  requestRemoval: async (targetUserId: number): Promise<void> => {
+    await fetchWithAuth<{ message: string }>('/households/removal-request', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId }),
+    });
+  },
+
+  voteOnRemoval: async (requestId: number, vote: 'approve' | 'reject'): Promise<void> => {
+    await fetchWithAuth<{ message: string }>(`/households/removal-request/${requestId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ vote }),
+    });
+  },
+
+  getRemovalRequests: async (): Promise<RemovalRequest[]> => {
+    const data = await fetchWithAuth<{ removalRequests: RemovalRequest[] }>('/households/removal-requests');
+    return data.removalRequests;
   },
 };
 

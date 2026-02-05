@@ -3,10 +3,22 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+// Generate a random invite code
+function generateInviteCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'HH-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Clear existing data
+  // Clear existing data (in reverse order of dependencies)
+  await prisma.removalVote.deleteMany();
+  await prisma.removalRequest.deleteMany();
   await prisma.eventRsvp.deleteMany();
   await prisma.expenseSplit.deleteMany();
   await prisma.expense.deleteMany();
@@ -18,8 +30,20 @@ async function main() {
   await prisma.houseRule.deleteMany();
   await prisma.landlord.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.household.deleteMany();
 
-  // Create users
+  // Create household first
+  const household = await prisma.household.create({
+    data: {
+      name: 'Apartment 4B',
+      inviteCode: generateInviteCode(),
+      createdByUserId: 1, // Will be updated after creating the admin user
+    },
+  });
+
+  console.log(`✅ Created household: ${household.name} (Code: ${household.inviteCode})`);
+
+  // Create users with household
   const hashedPassword = await bcrypt.hash('password123', 10);
 
   const abhay = await prisma.user.create({
@@ -28,7 +52,15 @@ async function main() {
       email: 'abhay@example.com',
       password: hashedPassword,
       avatarUrl: 'https://placehold.co/100x100/A8D5BA/004643?text=A',
+      role: 'admin',
+      householdId: household.id,
     },
+  });
+
+  // Update household with correct createdByUserId
+  await prisma.household.update({
+    where: { id: household.id },
+    data: { createdByUserId: abhay.id },
   });
 
   const bilal = await prisma.user.create({
@@ -37,6 +69,8 @@ async function main() {
       email: 'bilal@example.com',
       password: hashedPassword,
       avatarUrl: 'https://placehold.co/100x100/F0A692/FFFFFF?text=B',
+      role: 'member',
+      householdId: household.id,
     },
   });
 
@@ -46,6 +80,8 @@ async function main() {
       email: 'chatur@example.com',
       password: hashedPassword,
       avatarUrl: 'https://placehold.co/100x100/F6D9C2/000000?text=C',
+      role: 'member',
+      householdId: household.id,
     },
   });
 
@@ -55,17 +91,20 @@ async function main() {
       email: 'deepak@example.com',
       password: hashedPassword,
       avatarUrl: 'https://placehold.co/100x100/004643/FFFFFF?text=D',
+      role: 'member',
+      householdId: household.id,
     },
   });
 
   console.log('✅ Created users');
 
-  // Create expenses
+  // Create expenses with householdId
   const groceries = await prisma.expense.create({
     data: {
       description: 'Groceries',
       totalAmount: 500,
       paidByUserId: bilal.id,
+      householdId: household.id,
       date: new Date('2025-09-18'),
       splits: {
         create: [
@@ -82,6 +121,7 @@ async function main() {
       description: 'Wi-Fi Bill',
       totalAmount: 800,
       paidByUserId: chatur.id,
+      householdId: household.id,
       date: new Date('2025-09-15'),
       splits: {
         create: [
@@ -96,6 +136,7 @@ async function main() {
       description: 'Movie Night Pizza',
       totalAmount: 1000,
       paidByUserId: abhay.id,
+      householdId: household.id,
       date: new Date('2025-09-12'),
       splits: {
         create: [
@@ -108,26 +149,27 @@ async function main() {
 
   console.log('✅ Created expenses');
 
-  // Create chores
+  // Create chores with householdId
   await prisma.chore.createMany({
     data: [
-      { title: 'Clean Kitchen', assignedToUserId: abhay.id, points: 20, status: 'todo' },
-      { title: 'Buy Tissue Paper', assignedToUserId: null, points: 5, status: 'todo' },
-      { title: 'Take out recycling', assignedToUserId: deepak.id, points: 10, status: 'in_progress' },
-      { title: 'Bathroom Deep Clean', assignedToUserId: chatur.id, points: 30, status: 'done' },
-      { title: 'Wipe down kitchen counter', assignedToUserId: bilal.id, points: 5, status: 'done' },
+      { title: 'Clean Kitchen', assignedToUserId: abhay.id, points: 20, status: 'todo', householdId: household.id },
+      { title: 'Buy Tissue Paper', assignedToUserId: null, points: 5, status: 'todo', householdId: household.id },
+      { title: 'Take out recycling', assignedToUserId: deepak.id, points: 10, status: 'in_progress', householdId: household.id },
+      { title: 'Bathroom Deep Clean', assignedToUserId: chatur.id, points: 30, status: 'done', householdId: household.id },
+      { title: 'Wipe down kitchen counter', assignedToUserId: bilal.id, points: 5, status: 'done', householdId: household.id },
     ],
   });
 
   console.log('✅ Created chores');
 
-  // Create events
+  // Create events with householdId
   const boardGame = await prisma.event.create({
     data: {
       title: 'Board Game Night',
       date: new Date('2025-09-20T19:00:00'),
       location: 'Living Room',
       createdByUserId: chatur.id,
+      householdId: household.id,
     },
   });
 
@@ -137,66 +179,71 @@ async function main() {
       date: new Date('2025-09-27T08:00:00'),
       location: 'Meet at entrance',
       createdByUserId: deepak.id,
+      householdId: household.id,
     },
   });
 
   console.log('✅ Created events');
 
-  // Create landlord
+  // Create landlord with householdId
   await prisma.landlord.create({
     data: {
       name: 'Mr. Rajesh Sharma',
       phone: '+91 98765 43210',
       email: 'rajesh.sharma@gmail.com',
+      householdId: household.id,
     },
   });
 
   console.log('✅ Created landlord');
 
-  // Create issues
+  // Create issues with householdId
   await prisma.issue.createMany({
     data: [
-      { title: 'Leaky Faucet in Kitchen', status: 'Reported', reportedByUserId: abhay.id },
-      { title: 'Balcony door lock is stiff', status: 'Resolved', reportedByUserId: bilal.id },
+      { title: 'Leaky Faucet in Kitchen', status: 'Reported', reportedByUserId: abhay.id, householdId: household.id },
+      { title: 'Balcony door lock is stiff', status: 'Resolved', reportedByUserId: bilal.id, householdId: household.id },
     ],
   });
 
   console.log('✅ Created issues');
 
-  // Create documents
+  // Create documents with householdId
   await prisma.document.create({
     data: {
       name: 'Rental Agreement 2025.pdf',
       uploadedByUserId: abhay.id,
       size: '2.4 MB',
+      householdId: household.id,
     },
   });
 
   console.log('✅ Created documents');
 
-  // Create house rules
+  // Create house rules with householdId
   await prisma.houseRule.createMany({
     data: [
-      { content: 'Quiet hours are from 11 PM to 7 AM on weeknights.', orderNum: 1 },
-      { content: 'Clean up common areas after use.', orderNum: 2 },
-      { content: 'Guests are welcome, but please give a heads-up for overnight stays.', orderNum: 3 },
-      { content: 'Label your food in the fridge.', orderNum: 4 },
+      { content: 'Quiet hours are from 11 PM to 7 AM on weeknights.', orderNum: 1, householdId: household.id },
+      { content: 'Clean up common areas after use.', orderNum: 2, householdId: household.id },
+      { content: 'Guests are welcome, but please give a heads-up for overnight stays.', orderNum: 3, householdId: household.id },
+      { content: 'Label your food in the fridge.', orderNum: 4, householdId: household.id },
     ],
   });
 
   console.log('✅ Created house rules');
 
-  // Create bulletin posts
+  // Create bulletin posts with householdId
   await prisma.bulletinPost.createMany({
     data: [
       { 
         content: "Hey everyone, I'm having a package delivered on Friday, could you keep an eye out?", 
         postedByUserId: chatur.id,
+        householdId: household.id,
         createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
       },
       { 
         content: "The mixer grinder seems to be making a weird noise. Let's not use it until we check it out.", 
         postedByUserId: deepak.id,
+        householdId: household.id,
         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
       },
     ],

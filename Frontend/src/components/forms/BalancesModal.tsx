@@ -27,7 +27,7 @@ const BalancesModal = ({ onClose, balances, onSettle }: BalancesModalProps): JSX
   }, []);
 
   const getUserById = (userId: string): User => {
-    return users.find(u => u.id === Number(userId)) || { id: 0, name: 'Unknown', email: '', avatarUrl: null };
+    return users.find(u => u.id === Number(userId)) || { id: 0, name: 'Unknown', email: '', avatarUrl: null, householdId: null, role: null };
   };
 
   const handleSettle = async (userId: string): Promise<void> => {

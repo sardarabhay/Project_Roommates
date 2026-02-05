@@ -16,6 +16,7 @@ import documentRoutes from './routes/documents.js';
 import landlordRoutes from './routes/landlord.js';
 import communicationRoutes from './routes/communication.js';
 import dashboardRoutes from './routes/dashboard.js';
+import householdRoutes from './routes/households.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +46,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/landlord', landlordRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/households', householdRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

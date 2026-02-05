@@ -1,4 +1,4 @@
-import { Menu, Search, Bell, Sun, Moon, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, Search, Bell, Sun, Moon, LogOut, User as UserIcon, Home } from 'lucide-react';
 import { useState } from 'react';
 import type { User } from '../../types';
 
@@ -8,9 +8,10 @@ interface HeaderProps {
   toggleTheme: () => void;
   isDarkMode: boolean;
   onLogout: () => void;
+  onHouseholdSettings: () => void;
 }
 
-const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout }: HeaderProps): JSX.Element => {
+const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout, onHouseholdSettings }: HeaderProps): JSX.Element => {
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
 
   const handleLogout = (): void => {
@@ -56,6 +57,13 @@ const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout }: Hea
                 </div>
               </div>
               <div className="p-2">
+                <button 
+                  onClick={() => { setShowDropdown(false); onHouseholdSettings(); }}
+                  className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Household Settings
+                </button>
                 <button className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
                   <UserIcon className="w-4 h-4 mr-2" />
                   Profile Settings

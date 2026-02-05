@@ -4,7 +4,41 @@ export interface User {
   name: string;
   email: string;
   avatarUrl: string | null;
+  householdId: number | null;
+  role: 'admin' | 'member' | null;
   createdAt?: string;
+}
+
+// Household types
+export interface Household {
+  id: number;
+  name: string;
+  inviteCode: string;
+  createdByUserId: number;
+  createdAt: string;
+  members?: HouseholdMember[];
+}
+
+export interface HouseholdMember {
+  id: number;
+  name: string;
+  avatarUrl: string | null;
+  role: 'admin' | 'member';
+}
+
+export interface RemovalRequest {
+  id: number;
+  targetUser: { id: number; name: string; avatarUrl: string | null };
+  requestedBy: { id: number; name: string };
+  reason: string | null;
+  votes: RemovalVote[];
+  myVote: 'approve' | 'reject' | null;
+  createdAt: string;
+}
+
+export interface RemovalVote {
+  userId: number;
+  vote: 'approve' | 'reject';
 }
 
 // Expense types
@@ -172,7 +206,8 @@ export type ModalType =
   | 'addTask' 
   | 'reportIssue' 
   | 'createEvent' 
-  | 'settleUp' 
+  | 'settleUp'
+  | 'householdSettings' 
   | null;
 
 // Module types
@@ -185,4 +220,4 @@ export type ModuleType =
   | 'events';
 
 // Auth state types
-export type AuthState = 'loading' | 'login' | 'signup-success' | 'logged-in';
+export type AuthState = 'loading' | 'login' | 'signup-success' | 'needs-household' | 'logged-in';

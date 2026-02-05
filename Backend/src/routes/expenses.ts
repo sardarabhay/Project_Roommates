@@ -17,7 +17,23 @@ const validateExpense: ValidationChain[] = [
 // GET /api/expenses - Get all expenses
 router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.json([]);
+      return;
+    }
+
     const expenses = await prisma.expense.findMany({
+      where: {
+        householdId: currentUser.householdId,
+      },
       include: {
         paidByUser: {
           select: { id: true, name: true, avatarUrl: true },
@@ -100,6 +116,19 @@ router.post('/', authenticateToken, validateExpense, async (req: Request, res: R
       return;
     }
 
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to create expenses' });
+      return;
+    }
+
     const { description, totalAmount, paidByUserId, date, splits, category } = req.body as {
       description: string;
       totalAmount: number;
@@ -109,13 +138,15 @@ router.post('/', authenticateToken, validateExpense, async (req: Request, res: R
       category?: string;
     };
 
-    // Get all users if splitting equally
+    // Get all users in household if splitting equally
     let splitData = splits;
     if (!splits || splits.length === 0) {
-      const users = await prisma.user.findMany();
+      const users = await prisma.user.findMany({
+        where: { householdId: currentUser.householdId },
+      });
       const splitAmount = totalAmount / users.length;
       splitData = users
-        .filter((u) => u.id !== (paidByUserId || req.user!.id))
+        .filter((u) => u.id !== (paidByUserId || userId))
         .map((u) => ({
           owedByUserId: u.id,
           amount: splitAmount,
@@ -127,8 +158,9 @@ router.post('/', authenticateToken, validateExpense, async (req: Request, res: R
         description,
         totalAmount,
         category: category || 'other',
-        paidByUserId: paidByUserId || req.user!.id,
-        createdByUserId: req.user!.id,
+        paidByUserId: paidByUserId || userId,
+        createdByUserId: userId,
+        householdId: currentUser.householdId,
         date: date ? new Date(date) : new Date(),
         splits: {
           create: splitData,

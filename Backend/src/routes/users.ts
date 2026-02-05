@@ -4,15 +4,32 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router: Router = express.Router();
 
-// GET /api/users - Get all users (roommates)
+// GET /api/users - Get all users (roommates in same household)
 router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.json([]); // No household, no roommates
+      return;
+    }
+
     const users = await prisma.user.findMany({
+      where: {
+        householdId: currentUser.householdId,
+      },
       select: {
         id: true,
         name: true,
         email: true,
         avatarUrl: true,
+        role: true,
       },
       orderBy: { name: 'asc' },
     });

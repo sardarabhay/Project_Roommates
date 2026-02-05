@@ -10,7 +10,21 @@ const router: Router = express.Router();
 // GET /api/communication/rules - Get all house rules
 router.get('/rules', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to view house rules' });
+      return;
+    }
+
     const rules = await prisma.houseRule.findMany({
+      where: { householdId: currentUser.householdId },
       orderBy: { orderNum: 'asc' },
     });
 
@@ -24,6 +38,19 @@ router.get('/rules', authenticateToken, async (req: Request, res: Response): Pro
 // POST /api/communication/rules - Create house rule
 router.post('/rules', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to create house rules' });
+      return;
+    }
+
     const { content } = req.body as { content: string };
 
     if (!content) {
@@ -31,8 +58,9 @@ router.post('/rules', authenticateToken, async (req: Request, res: Response): Pr
       return;
     }
 
-    // Get max order number
+    // Get max order number for this household
     const maxOrder = await prisma.houseRule.findFirst({
+      where: { householdId: currentUser.householdId },
       orderBy: { orderNum: 'desc' },
     });
 
@@ -40,6 +68,7 @@ router.post('/rules', authenticateToken, async (req: Request, res: Response): Pr
       data: {
         content,
         orderNum: (maxOrder?.orderNum || 0) + 1,
+        householdId: currentUser.householdId,
       },
     });
 
@@ -89,7 +118,21 @@ router.delete('/rules/:id', authenticateToken, async (req: Request, res: Respons
 // GET /api/communication/bulletin - Get all bulletin posts
 router.get('/bulletin', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to view bulletin posts' });
+      return;
+    }
+
     const posts = await prisma.bulletinPost.findMany({
+      where: { householdId: currentUser.householdId },
       include: {
         postedByUser: {
           select: { id: true, name: true, avatarUrl: true },
@@ -108,6 +151,19 @@ router.get('/bulletin', authenticateToken, async (req: Request, res: Response): 
 // POST /api/communication/bulletin - Create bulletin post
 router.post('/bulletin', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to create bulletin posts' });
+      return;
+    }
+
     const { content } = req.body as { content: string };
 
     if (!content) {
@@ -118,7 +174,8 @@ router.post('/bulletin', authenticateToken, async (req: Request, res: Response):
     const post = await prisma.bulletinPost.create({
       data: {
         content,
-        postedByUserId: req.user!.id,
+        postedByUserId: userId,
+        householdId: currentUser.householdId,
       },
       include: {
         postedByUser: {

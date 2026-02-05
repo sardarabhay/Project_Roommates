@@ -15,9 +15,23 @@ const validateChore: ValidationChain[] = [
 // GET /api/chores - Get all chores grouped by status
 router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.json({ todo: [], in_progress: [], done: [] });
+      return;
+    }
+
     const chores = await prisma.chore.findMany({
       where: {
         isArchived: false,
+        householdId: currentUser.householdId,
       },
       include: {
         assignedToUser: {
@@ -44,9 +58,23 @@ router.get('/', authenticateToken, async (req: Request, res: Response): Promise<
 // GET /api/chores/list - Get all chores as flat list
 router.get('/list', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.json([]);
+      return;
+    }
+
     const chores = await prisma.chore.findMany({
       where: {
         isArchived: false,
+        householdId: currentUser.householdId,
       },
       include: {
         assignedToUser: {
@@ -72,6 +100,19 @@ router.post('/', authenticateToken, validateChore, async (req: Request, res: Res
       return;
     }
 
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to create chores' });
+      return;
+    }
+
     const { title, description, assignedToUserId, points, dueDate, status, isRecurring, recurringPattern } = req.body as {
       title: string;
       description?: string;
@@ -93,7 +134,8 @@ router.post('/', authenticateToken, validateChore, async (req: Request, res: Res
         status: status || 'todo',
         isRecurring: isRecurring || false,
         recurringPattern: recurringPattern || null,
-        createdByUserId: req.user!.id,
+        createdByUserId: userId,
+        householdId: currentUser.householdId,
       },
       include: {
         assignedToUser: {

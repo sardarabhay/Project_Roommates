@@ -31,7 +31,21 @@ const transformRsvps = (rsvps: RsvpWithUser[]): EventRsvps => {
 // GET /api/events - Get all events
 router.get('/', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to view events' });
+      return;
+    }
+
     const events = await prisma.event.findMany({
+      where: { householdId: currentUser.householdId },
       include: {
         createdByUser: {
           select: { id: true, name: true, avatarUrl: true },
@@ -103,6 +117,19 @@ router.post('/', authenticateToken, validateEvent, async (req: Request, res: Res
       return;
     }
 
+    const userId = req.user!.id;
+    
+    // Get current user's household
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { householdId: true },
+    });
+
+    if (!currentUser?.householdId) {
+      res.status(400).json({ error: 'You must be in a household to create events' });
+      return;
+    }
+
     const { title, location, date } = req.body as { title: string; location: string; date: string };
 
     const event = await prisma.event.create({
@@ -110,7 +137,8 @@ router.post('/', authenticateToken, validateEvent, async (req: Request, res: Res
         title,
         location,
         date: new Date(date),
-        createdByUserId: req.user!.id,
+        createdByUserId: userId,
+        householdId: currentUser.householdId,
       },
       include: {
         createdByUser: {
