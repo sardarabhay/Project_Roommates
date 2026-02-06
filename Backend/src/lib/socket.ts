@@ -20,10 +20,10 @@ const userSockets = new Map<number, string>();
 // Map of householdId to set of socket ids for room-based messaging
 const householdRooms = new Map<number, Set<string>>();
 
-export function initializeSocket(server: HttpServer): Server {
+export function initializeSocket(server: HttpServer, allowedOrigins: string[] = ['http://localhost:3001', 'http://127.0.0.1:3001']): Server {
   io = new Server(server, {
     cors: {
-      origin: ['http://localhost:3001', 'http://127.0.0.1:3001'],
+      origin: allowedOrigins,
       credentials: true,
     },
   });

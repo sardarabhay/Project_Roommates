@@ -28,8 +28,13 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// CORS configuration
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:3001', 'http://127.0.0.1:3001'];
+
 // Initialize Socket.io
-initializeSocket(server);
+initializeSocket(server, allowedOrigins);
 
 // Initialize Firebase (for push notifications)
 initializeFirebase();
@@ -37,7 +42,7 @@ initializeFirebase();
 // Middleware
 app.use(
   cors({
-    origin: ['http://localhost:3001', 'http://127.0.0.1:3001'],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
