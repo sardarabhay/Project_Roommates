@@ -2,6 +2,8 @@ import express, { Request, Response, Router } from 'express';
 import { body, validationResult, ValidationChain } from 'express-validator';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emitToHousehold, SocketEvents } from '../lib/socket.js';
+import { sendNotificationToUser, NotificationTemplates } from '../lib/notifications.js';
 import type { ExpenseSplitInput, BalancesResponse } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -176,6 +178,19 @@ router.post('/', authenticateToken, validateExpense, async (req: Request, res: R
         },
       },
     });
+
+    // Emit socket event to household
+    emitToHousehold(currentUser.householdId, SocketEvents.EXPENSE_CREATED, expense);
+
+    // Send push notifications to users who owe money
+    for (const split of expense.splits) {
+      if (split.owedByUserId !== userId) {
+        await sendNotificationToUser(
+          split.owedByUserId,
+          NotificationTemplates.expenseOwed(expense.description, split.amount)
+        );
+      }
+    }
 
     res.status(201).json(expense);
   } catch (error) {

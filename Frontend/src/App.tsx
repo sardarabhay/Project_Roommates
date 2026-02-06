@@ -6,6 +6,8 @@ import HouseholdSettings from './components/household/HouseholdSettings';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import Modal from './components/common/Modal';
+import ToastContainer from './components/common/ToastContainer';
+import { NotificationProvider } from './contexts/NotificationContext';
 import DashboardModule from './components/modules/DashboardModule';
 import FinanceModule from './components/modules/FinanceModule';
 import ChoresModule from './components/modules/ChoresModule';
@@ -81,6 +83,10 @@ export default function App(): JSX.Element {
   const handleLogin = (): void => {
     const user = getUser();
     setCurrentUser(user);
+    // Request browser notification permission
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
     // Check if user has a household
     if (!user?.householdId) {
       setAuthState('needs-household');
@@ -181,26 +187,29 @@ export default function App(): JSX.Element {
   const user: User = currentUser || { id: 0, name: 'User', email: '', avatarUrl: 'https://placehold.co/100x100/A8D5BA/004643?text=U', householdId: null, role: null };
 
   return (
-    <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50'}`}>
-      <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          user={user} 
-          setSidebarOpen={setSidebarOpen} 
-          toggleTheme={toggleTheme} 
-          isDarkMode={isDarkMode} 
-          onLogout={handleLogout}
-          onHouseholdSettings={() => openModal('householdSettings')}
-        />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
-          {renderModule()}
-        </main>
+    <NotificationProvider userId={user.id} householdId={user.householdId || undefined}>
+      <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-50'}`}>
+        <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header 
+            user={user} 
+            setSidebarOpen={setSidebarOpen} 
+            toggleTheme={toggleTheme} 
+            isDarkMode={isDarkMode} 
+            onLogout={handleLogout}
+            onHouseholdSettings={() => openModal('householdSettings')}
+          />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
+            {renderModule()}
+          </main>
+        </div>
+        {activeModal && (
+          <Modal isOpen={!!activeModal} onClose={closeModal}>
+            {renderModalContent()}
+          </Modal>
+        )}
+        <ToastContainer />
       </div>
-      {activeModal && (
-        <Modal isOpen={!!activeModal} onClose={closeModal}>
-          {renderModalContent()}
-        </Modal>
-      )}
-    </div>
+    </NotificationProvider>
   );
 }

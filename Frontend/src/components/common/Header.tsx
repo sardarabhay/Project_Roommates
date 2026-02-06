@@ -1,5 +1,6 @@
-import { Menu, Search, Bell, Sun, Moon, LogOut, User as UserIcon, Home } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, Search, Bell, BellOff, BellRing, Sun, Moon, LogOut, User as UserIcon, Home } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNotifications } from '../../contexts/NotificationContext';
 import type { User } from '../../types';
 
 interface HeaderProps {
@@ -13,10 +14,34 @@ interface HeaderProps {
 
 const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout, onHouseholdSettings }: HeaderProps): JSX.Element => {
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  const [showNotifDropdown, setShowNotifDropdown] = useState<boolean>(false);
+  const { permissionGranted, requestPermission } = useNotifications();
+
+  // Auto-close notification dropdown after 3 seconds
+  useEffect(() => {
+    if (showNotifDropdown) {
+      const timer = setTimeout(() => {
+        setShowNotifDropdown(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showNotifDropdown]);
 
   const handleLogout = (): void => {
     setShowDropdown(false);
     onLogout();
+  };
+
+  const handleNotificationClick = async (): Promise<void> => {
+    if (!permissionGranted) {
+      const granted = await requestPermission();
+      if (granted) {
+        // Show confirmation dropdown briefly
+        setShowNotifDropdown(true);
+      }
+    } else {
+      setShowNotifDropdown(!showNotifDropdown);
+    }
   };
 
   return (
@@ -35,7 +60,33 @@ const Header = ({ user, setSidebarOpen, toggleTheme, isDarkMode, onLogout, onHou
         <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
           {isDarkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
         </button>
-        <Bell className="w-6 h-6 text-gray-500 dark:text-gray-400 cursor-pointer hover:text-teal-600 dark:hover:text-teal-400" />
+        <div className="relative">
+          <button 
+            onClick={handleNotificationClick}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 relative"
+            title={permissionGranted ? 'Notifications enabled' : 'Click to enable notifications'}
+          >
+            {permissionGranted ? (
+              <Bell className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            ) : (
+              <BellOff className="w-5 h-5 text-gray-400" />
+            )}
+            {!permissionGranted && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
+          </button>
+          {showNotifDropdown && permissionGranted && (
+            <div className="absolute right-0 top-12 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-4">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <BellRing className="w-5 h-5" />
+                <span className="text-sm font-medium">Notifications enabled!</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                You'll receive notifications when roommates add chores, expenses, or events.
+              </p>
+            </div>
+          )}
+        </div>
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}

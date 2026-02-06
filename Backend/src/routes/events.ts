@@ -2,6 +2,8 @@ import express, { Request, Response, Router } from 'express';
 import { body, validationResult, ValidationChain } from 'express-validator';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emitToHousehold, SocketEvents } from '../lib/socket.js';
+import { sendNotificationToHousehold, NotificationTemplates } from '../lib/notifications.js';
 import type { EventRsvps, UserPublic } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -147,10 +149,24 @@ router.post('/', authenticateToken, validateEvent, async (req: Request, res: Res
       },
     });
 
-    res.status(201).json({
+    const eventWithRsvps = {
       ...event,
       rsvps: { going: [], maybe: [], notGoing: [] },
-    });
+    };
+
+    // Emit socket event to household
+    emitToHousehold(currentUser.householdId, SocketEvents.EVENT_CREATED, eventWithRsvps);
+
+    // Send push notification to household
+    const creatorName = event.createdByUser?.name || 'Someone';
+    const dateStr = new Date(event.date).toLocaleDateString();
+    await sendNotificationToHousehold(
+      currentUser.householdId,
+      NotificationTemplates.eventCreated(event.title, creatorName, dateStr),
+      userId
+    );
+
+    res.status(201).json(eventWithRsvps);
   } catch (error) {
     console.error('Create event error:', error);
     res.status(500).json({ error: 'Failed to create event' });

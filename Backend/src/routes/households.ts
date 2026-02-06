@@ -1,6 +1,8 @@
 import express, { Request, Response, RequestHandler } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emitToHousehold, SocketEvents } from '../lib/socket.js';
+import { sendNotificationToHousehold, NotificationTemplates } from '../lib/notifications.js';
 
 const router = express.Router();
 
@@ -169,13 +171,30 @@ const joinHousehold: RequestHandler = async (req: Request, res: Response): Promi
     }
 
     // Add user to household
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         householdId: household.id,
         role: 'member',
       },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        role: true,
+      },
     });
+
+    // Emit socket event to existing household members
+    emitToHousehold(household.id, SocketEvents.MEMBER_JOINED, updatedUser);
+
+    // Send push notification to household
+    await sendNotificationToHousehold(
+      household.id,
+      NotificationTemplates.memberJoined(updatedUser.name),
+      userId
+    );
 
     res.json({
       message: 'Successfully joined household',

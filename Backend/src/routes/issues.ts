@@ -2,6 +2,8 @@ import express, { Request, Response, Router } from 'express';
 import { body, validationResult, ValidationChain } from 'express-validator';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emitToHousehold, SocketEvents } from '../lib/socket.js';
+import { sendNotificationToHousehold, NotificationTemplates } from '../lib/notifications.js';
 
 const router: Router = express.Router();
 
@@ -82,6 +84,17 @@ router.post('/', authenticateToken, validateIssue, async (req: Request, res: Res
         },
       },
     });
+
+    // Emit socket event to household
+    emitToHousehold(currentUser.householdId, SocketEvents.ISSUE_CREATED, issue);
+
+    // Send push notification to household
+    const reporterName = issue.reportedByUser?.name || 'Someone';
+    await sendNotificationToHousehold(
+      currentUser.householdId,
+      NotificationTemplates.issueReported(issue.title, reporterName),
+      userId
+    );
 
     res.status(201).json(issue);
   } catch (error) {

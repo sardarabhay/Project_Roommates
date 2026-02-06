@@ -2,6 +2,8 @@ import express, { Request, Response, Router } from 'express';
 import { body, validationResult, ValidationChain } from 'express-validator';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emitToHousehold, SocketEvents } from '../lib/socket.js';
+import { sendNotificationToUser, sendNotificationToHousehold, NotificationTemplates } from '../lib/notifications.js';
 import type { ChoresGrouped } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -141,8 +143,30 @@ router.post('/', authenticateToken, validateChore, async (req: Request, res: Res
         assignedToUser: {
           select: { id: true, name: true, avatarUrl: true },
         },
+        createdByUser: {
+          select: { id: true, name: true },
+        },
       },
     });
+
+    // Emit socket event to household
+    emitToHousehold(currentUser.householdId, SocketEvents.CHORE_CREATED, chore);
+
+    // Send push notification to household (except creator)
+    const creatorName = chore.createdByUser?.name || 'Someone';
+    await sendNotificationToHousehold(
+      currentUser.householdId,
+      NotificationTemplates.choreCreated(chore.title, creatorName),
+      userId
+    );
+
+    // If assigned to someone, send them a specific notification
+    if (assignedToUserId && assignedToUserId !== userId) {
+      await sendNotificationToUser(
+        assignedToUserId,
+        NotificationTemplates.choreAssigned(chore.title, creatorName)
+      );
+    }
 
     res.status(201).json(chore);
   } catch (error) {
@@ -211,6 +235,11 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
       },
     });
 
+    // Emit socket event
+    if (existingChore.householdId) {
+      emitToHousehold(existingChore.householdId, SocketEvents.CHORE_UPDATED, chore);
+    }
+
     res.json(chore);
   } catch (error) {
     console.error('Update chore error:', error);
@@ -278,11 +307,27 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
           dueDate: nextDueDate,
           assignedToUserId: existingChore.assignedToUserId,
           createdByUserId: existingChore.createdByUserId,
+          householdId: existingChore.householdId,
           isRecurring: true,
           recurringPattern: existingChore.recurringPattern,
           status: 'todo',
         },
       });
+    }
+
+    // Emit socket event
+    if (existingChore.householdId) {
+      emitToHousehold(existingChore.householdId, SocketEvents.CHORE_UPDATED, chore);
+
+      // If completed, send push notification
+      if (status === 'done') {
+        const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } });
+        await sendNotificationToHousehold(
+          existingChore.householdId,
+          NotificationTemplates.choreCompleted(chore.title, user?.name || 'Someone'),
+          req.user!.id
+        );
+      }
     }
 
     res.json(chore);
@@ -345,6 +390,11 @@ router.put('/:id/claim', authenticateToken, async (req: Request, res: Response):
       },
     });
 
+    // Emit socket event
+    if (existingChore.householdId) {
+      emitToHousehold(existingChore.householdId, SocketEvents.CHORE_CLAIMED, chore);
+    }
+
     res.json(chore);
   } catch (error) {
     console.error('Claim chore error:', error);
@@ -385,6 +435,11 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
     await prisma.chore.delete({
       where: { id: parseInt(req.params.id as string) },
     });
+
+    // Emit socket event
+    if (existingChore.householdId) {
+      emitToHousehold(existingChore.householdId, SocketEvents.CHORE_DELETED, { id: existingChore.id });
+    }
 
     res.json({ message: 'Chore deleted successfully' });
   } catch (error) {

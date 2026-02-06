@@ -1,9 +1,14 @@
 import express, { Request, Response, NextFunction } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
+
+// Import Socket.io and Firebase
+import { initializeSocket } from './lib/socket.js';
+import { initializeFirebase } from './lib/notifications.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -17,9 +22,17 @@ import landlordRoutes from './routes/landlord.js';
 import communicationRoutes from './routes/communication.js';
 import dashboardRoutes from './routes/dashboard.js';
 import householdRoutes from './routes/households.js';
+import notificationRoutes from './routes/notifications.js';
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize Socket.io
+initializeSocket(server);
+
+// Initialize Firebase (for push notifications)
+initializeFirebase();
 
 // Middleware
 app.use(
@@ -47,6 +60,7 @@ app.use('/api/landlord', landlordRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/households', householdRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -62,7 +76,8 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📚 API Health: http://localhost:${PORT}/api/health`);
+  console.log(`🔌 Socket.io ready for real-time connections`);
 });
