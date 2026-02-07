@@ -145,7 +145,7 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
       addToast({
         type: 'info',
         title: 'New Expense Added',
-        message: `${data.paidByUser?.name || 'Someone'} added "${data.description}" ($${data.totalAmount.toFixed(2)})`,
+        message: `${data.paidByUser?.name || 'Someone'} added "${data.description}" (₹${data.totalAmount.toFixed(2)})`,
       });
     },
     [addToast]

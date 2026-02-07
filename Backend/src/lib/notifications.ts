@@ -115,7 +115,7 @@ export async function sendNotificationToHousehold(
     });
 
     console.log(
-      `📱 Push notifications sent to household ${householdId}: ${response.successCount}/${tokens.length} successful`
+      ` Push notifications sent to household ${householdId}: ${response.successCount}/${tokens.length} successful`
     );
     return response.successCount;
   } catch (error) {
@@ -146,13 +146,13 @@ export const NotificationTemplates = {
 
   expenseCreated: (description: string, amount: number, creatorName: string): NotificationPayload => ({
     title: 'New Expense Added',
-    body: `${creatorName} added "${description}" ($${amount.toFixed(2)})`,
+    body: `${creatorName} added "${description}" (₹${amount.toFixed(2)})`,
     data: { type: 'expense', action: 'created' },
   }),
 
   expenseOwed: (description: string, amount: number): NotificationPayload => ({
     title: 'You Owe Money',
-    body: `You owe $${amount.toFixed(2)} for "${description}"`,
+    body: `You owe ₹${amount.toFixed(2)} for "${description}"`,
     data: { type: 'expense', action: 'owed' },
   }),
 

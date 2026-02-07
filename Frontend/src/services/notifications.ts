@@ -48,8 +48,7 @@ export function showNotificationToast(
   body: string,
   onClick?: () => void
 ): void {
-  // You can integrate with a toast library like react-hot-toast or sonner
-  // For now, we'll use browser notification as fallback
+  
   if ('Notification' in window && Notification.permission === 'granted') {
     const notification = new Notification(title, {
       body,

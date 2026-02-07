@@ -60,7 +60,14 @@ interface ExpenseFormData {
 interface FormErrors {
   description?: string;
   amount?: string;
+  splits?: string;
   submit?: string;
+}
+
+interface UserSplit {
+  userId: number;
+  amount: string;
+  included: boolean;
 }
 
 const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Element => {
@@ -74,6 +81,7 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [splitEqually, setSplitEqually] = useState<boolean>(true);
+  const [userSplits, setUserSplits] = useState<UserSplit[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
@@ -81,15 +89,58 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
       try {
         const data = await usersApi.getAll();
         setUsers(data);
+        // Initialize splits for all users (everyone included, including payer)
+        setUserSplits(data.map(u => ({
+          userId: u.id,
+          amount: '',
+          included: true
+        })));
       } catch (error) {
         console.error('Failed to fetch users:', error);
       }
     };
     fetchUsers();
-  }, []);
+  }, [currentUser?.id]);
+
+  // When payer changes, keep everyone included (payer's share = what they cover themselves)
+  useEffect(() => {
+    // Just trigger a recalculation if needed
+  }, [formData.paidByUserId]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSplitAmountChange = (userId: number, amount: string): void => {
+    setUserSplits(prev => prev.map(s => 
+      s.userId === userId ? { ...s, amount } : s
+    ));
+  };
+
+  const handleSplitToggle = (userId: number): void => {
+    setUserSplits(prev => prev.map(s => 
+      s.userId === userId ? { ...s, included: !s.included, amount: s.included ? '' : s.amount } : s
+    ));
+  };
+
+  const getSplitRemaining = (): number => {
+    const total = parseFloat(formData.amount) || 0;
+    const allocated = userSplits
+      .filter(s => s.included)
+      .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+    return total - allocated;
+  };
+
+  const splitEvenlyAmongSelected = (): void => {
+    const total = parseFloat(formData.amount) || 0;
+    const includedUsers = userSplits.filter(s => s.included);
+    if (includedUsers.length === 0) return;
+    
+    const perPerson = (total / includedUsers.length).toFixed(2);
+    setUserSplits(prev => prev.map(s => ({
+      ...s,
+      amount: s.included ? perPerson : ''
+    })));
   };
   
   const validate = (): FormErrors => {
@@ -100,6 +151,24 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
     } else if (isNaN(Number(formData.amount)) || Number(formData.amount) <= 0) {
       newErrors.amount = 'Please enter a valid, positive amount.';
     }
+    
+    // Validate unequal splits
+    if (!splitEqually) {
+      const total = parseFloat(formData.amount) || 0;
+      const allocated = userSplits
+        .filter(s => s.included)
+        .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+      
+      if (Math.abs(total - allocated) > 0.01) {
+        newErrors.splits = `Split amounts must equal total (₹${total.toFixed(2)}). Currently: ₹${allocated.toFixed(2)}`;
+      }
+      
+      const hasInvalidAmount = userSplits.some(s => s.included && (parseFloat(s.amount) || 0) <= 0);
+      if (hasInvalidAmount) {
+        newErrors.splits = 'All included users must have a positive amount.';
+      }
+    }
+    
     return newErrors;
   };
 
@@ -111,11 +180,24 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
     if (Object.keys(validationErrors).length === 0) {
       setIsSubmitting(true);
       try {
+        const payerId = parseInt(formData.paidByUserId);
+        
+        // Prepare splits for unequal option - exclude the payer (they don't owe themselves)
+        const splits = !splitEqually 
+          ? userSplits
+              .filter(s => s.included && parseFloat(s.amount) > 0 && s.userId !== payerId)
+              .map(s => ({
+                owedByUserId: s.userId,
+                amount: parseFloat(s.amount)
+              }))
+          : undefined;
+
         await expensesApi.create({
           description: formData.description,
           totalAmount: parseFloat(formData.amount),
-          paidByUserId: parseInt(formData.paidByUserId),
+          paidByUserId: payerId,
           category: formData.category,
+          splits,
         });
         if (onSuccess) onSuccess();
         onClose();
@@ -130,8 +212,8 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 max-h-[80vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-6 sticky top-0 bg-white dark:bg-gray-800 pb-2 -mt-2 pt-2 z-10">
         <h3 className="text-xl font-bold">Add New Expense</h3>
         <button onClick={onClose}><X className="w-6 h-6 text-gray-500" /></button>
       </div>
@@ -176,8 +258,82 @@ const AddExpenseForm = ({ onClose, onSuccess }: AddExpenseFormProps): JSX.Elemen
             <button type="button" onClick={() => setSplitEqually(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold w-full ${!splitEqually ? 'bg-teal-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>Unequally</button>
           </div>
         </div>
+
+        {/* Unequal Split UI */}
+        {!splitEqually && (
+          <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Enter each person's share
+              </span>
+              <button
+                type="button"
+                onClick={splitEvenlyAmongSelected}
+                className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+              >
+                Split evenly
+              </button>
+            </div>
+            
+            {users.map(user => {
+              const split = userSplits.find(s => s.userId === user.id);
+              const isPayer = user.id === parseInt(formData.paidByUserId);
+              
+              return (
+                <div key={user.id} className="flex items-center gap-3 p-2 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={split?.included || false}
+                    onChange={() => handleSplitToggle(user.id)}
+                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                  />
+                  <img 
+                    src={user.avatarUrl || ''} 
+                    alt={user.name} 
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="flex-1 text-sm font-medium">
+                    {user.name} {isPayer && <span className="text-teal-600">(Payer - their share)</span>}
+                  </span>
+                  {split?.included && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-gray-500">₹</span>
+                      <input
+                        type="number"
+                        value={split.amount}
+                        onChange={(e) => handleSplitAmountChange(user.id, e.target.value)}
+                        placeholder="0.00"
+                        className="w-20 p-1 text-sm rounded border bg-white dark:bg-gray-600 dark:border-gray-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {formData.amount && (
+              <div className={`text-sm font-medium pt-2 border-t dark:border-gray-600 ${
+                Math.abs(getSplitRemaining()) < 0.01 
+                  ? 'text-green-600' 
+                  : 'text-red-500'
+              }`}>
+                {Math.abs(getSplitRemaining()) < 0.01 
+                  ? '✓ Splits add up correctly'
+                  : `Remaining to allocate: ₹${getSplitRemaining().toFixed(2)}`
+                }
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              💡 The payer's share is what they cover for themselves. Others' shares become what they owe.
+            </p>
+            
+            {errors.splits && <p className="text-red-500 text-sm">{errors.splits}</p>}
+          </div>
+        )}
+
         {errors.submit && <p className="text-red-500 text-sm">{errors.submit}</p>}
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end space-x-3 pt-4 sticky bottom-0 bg-white dark:bg-gray-800 pb-2 -mb-2">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg font-semibold bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
           <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
             {isSubmitting ? 'Adding...' : 'Add Expense'}
