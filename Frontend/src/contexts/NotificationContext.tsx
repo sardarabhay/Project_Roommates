@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useSocket, useSocketEvent, SocketEvents } from './SocketContext';
+import { initializeFirebase, requestNotificationPermission as requestFcmPermission, onForegroundMessage } from '../lib/firebase';
+import { registerFcmToken } from '../services/notifications';
 
 export interface Toast {
   id: string;
@@ -38,7 +40,63 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
   const [permissionGranted, setPermissionGranted] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
   );
+  const [fcmInitialized, setFcmInitialized] = useState(false);
   const { joinHousehold, isConnected } = useSocket();
+
+  // Initialize Firebase on mount
+  useEffect(() => {
+    const app = initializeFirebase();
+    if (app) {
+      setFcmInitialized(true);
+      console.log('🔥 Firebase initialized for push notifications');
+    }
+  }, []);
+
+  // If permission was already granted, register FCM token
+  useEffect(() => {
+    const registerExistingPermission = async () => {
+      if (permissionGranted && fcmInitialized) {
+        try {
+          const fcmToken = await requestFcmPermission();
+          if (fcmToken) {
+            await registerFcmToken(fcmToken);
+            console.log('📱 FCM token registered on init');
+          }
+        } catch (error) {
+          console.error('Failed to register FCM token:', error);
+        }
+      }
+    };
+    registerExistingPermission();
+  }, [permissionGranted, fcmInitialized]);
+
+  // Handle FCM foreground messages
+  useEffect(() => {
+    if (!fcmInitialized) return;
+    
+    const unsubscribe = onForegroundMessage((payload: unknown) => {
+      const data = payload as { notification?: { title?: string; body?: string } };
+      if (data.notification) {
+        // Show as toast when in foreground
+        const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newToast: Toast = {
+          id,
+          type: 'info',
+          title: data.notification.title || 'HarmonyHomes',
+          message: data.notification.body || '',
+        };
+        setToasts(prev => [...prev, newToast]);
+        
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 5000);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [fcmInitialized]);
 
   // Join household room when connected
   useEffect(() => {
@@ -85,12 +143,27 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
       const permission = await Notification.requestPermission();
       const granted = permission === 'granted';
       setPermissionGranted(granted);
+      
+      // If permission granted, also register FCM token for push notifications
+      if (granted && fcmInitialized) {
+        try {
+          const fcmToken = await requestFcmPermission();
+          if (fcmToken) {
+            await registerFcmToken(fcmToken);
+            console.log('📱 FCM token registered for push notifications');
+          }
+        } catch (fcmError) {
+          console.error('Failed to register FCM token:', fcmError);
+          // Still return true since browser permission was granted
+        }
+      }
+      
       return granted;
     } catch (error) {
       console.error('Failed to request notification permission:', error);
       return false;
     }
-  }, []);
+  }, [fcmInitialized]);
 
   const showBrowserNotification = (title: string, body: string) => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
