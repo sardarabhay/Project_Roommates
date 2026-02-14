@@ -68,22 +68,35 @@ export const SocketProvider = ({ children }: SocketProviderProps): JSX.Element =
 
     const newSocket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling first for better mobile compatibility
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
 
     newSocket.on('connect', () => {
-      console.log('🔌 Socket connected');
+      console.log('🔌 Socket connected, id:', newSocket.id);
       setIsConnected(true);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket disconnected');
+    newSocket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected, reason:', reason);
       setIsConnected(false);
     });
 
     newSocket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       setIsConnected(false);
+    });
+
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+    });
+
+    newSocket.on('reconnect_error', (error) => {
+      console.error('Socket reconnect error:', error.message);
     });
 
     setSocket(newSocket);
