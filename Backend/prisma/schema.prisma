@@ -34,6 +34,7 @@ model User {
   email     String   @unique
   password  String?
   avatarUrl String?
+  googleId  String?  @unique // Google OAuth unique identifier
   role      String   @default("member") // admin, member
   fcmToken  String?  // Firebase Cloud Messaging token for push notifications
   createdAt DateTime @default(now())

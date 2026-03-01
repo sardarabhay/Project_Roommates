@@ -2,10 +2,15 @@ import express, { Request, Response, Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult, ValidationChain } from 'express-validator';
+import { OAuth2Client } from 'google-auth-library';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router: Router = express.Router();
+
+// Initialize Google OAuth client for token verification
+// The client ID is used to verify the token was issued for our app
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Validation middleware
 const validateSignup: ValidationChain[] = [
@@ -135,30 +140,68 @@ router.post('/login', validateLogin, async (req: Request, res: Response): Promis
   }
 });
 
-// POST /api/auth/google - Google OAuth
+// POST /api/auth/google - Google OAuth (SECURE)
+// This endpoint receives a Google ID token and verifies it server-side
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, name, avatarUrl } = req.body as { email: string; name: string; avatarUrl?: string };
+    const { idToken } = req.body as { idToken: string };
 
-    if (!email || !name) {
-      res.status(400).json({ error: 'Email and name are required' });
+    if (!idToken) {
+      res.status(400).json({ error: 'Google ID token is required' });
       return;
     }
 
-    // Find or create user
-    let user = await prisma.user.findUnique({ where: { email } });
+    // Verify the ID token with Google
+    // This is the CRITICAL security step - we ask Google "is this token real?"
+    // Google checks: 1) Token signature is valid 2) Token is not expired 3) Token was issued for our app
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID, // Must match our app's client ID
+    });
+
+    // Get the user info from the verified token
+    // This data comes directly from Google, not from the client - so it's trustworthy
+    const payload = ticket.getPayload();
+    
+    if (!payload || !payload.email) {
+      res.status(400).json({ error: 'Invalid Google token payload' });
+      return;
+    }
+
+    const { email, name, picture: avatarUrl, sub: googleId } = payload;
+
+    // Find existing user by email OR googleId
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          { googleId },
+        ],
+      },
+    });
 
     if (!user) {
-      const initial = name.charAt(0).toUpperCase();
+      // Create new user - no password since they're using Google
+      const initial = (name || email).charAt(0).toUpperCase();
       user = await prisma.user.create({
         data: {
-          name,
+          name: name || email.split('@')[0], // Use email prefix if no name
           email,
+          googleId,
           avatarUrl: avatarUrl || `https://placehold.co/100x100/A8D5BA/004643?text=${initial}`,
         },
       });
+      console.log(`✨ New user created via Google: ${email}`);
+    } else if (!user.googleId) {
+      // Link Google account to existing email account
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId },
+      });
+      console.log(`🔗 Linked Google account to existing user: ${email}`);
     }
 
+    // Generate our app's JWT token
     const token = generateToken(user);
 
     res.json({
@@ -175,7 +218,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     console.error('Google login error:', error);
-    res.status(500).json({ error: 'Failed to login with Google' });
+    // Don't expose internal error details to client
+    res.status(401).json({ error: 'Google authentication failed. Please try again.' });
   }
 });
 

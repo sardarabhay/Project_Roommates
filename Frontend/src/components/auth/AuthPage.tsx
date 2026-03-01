@@ -1,5 +1,5 @@
 import { useState, ChangeEvent, FormEvent } from 'react';
-import { GoogleIcon } from './GoogleIcon';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import FormInput from './FormInput';
 import Card from '../common/Card';
 import { authApi } from '../../services/api';
@@ -77,16 +77,21 @@ const AuthPage = ({ onLogin, onSignupSuccess }: AuthPageProps): JSX.Element => {
     }
   };
 
-  const handleGoogleLogin = async (): Promise<void> => {
+  // Google Sign-In success handler
+  // This is called when the user successfully signs in with Google
+  // The credentialResponse contains the ID token (credential) that we send to our backend
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse): Promise<void> => {
     setIsLoading(true);
     setApiError('');
     
     try {
-      // For demo purposes, simulate Google OAuth with a test user
-      // In production, you would integrate with actual Google OAuth
-      const demoEmail = 'demo@harmonyhomes.com';
-      const demoName = 'Demo User';
-      await authApi.googleLogin(demoEmail, demoName);
+      // credentialResponse.credential is the ID token (JWT signed by Google)
+      // Our backend will verify this token with Google to ensure it's legitimate
+      if (!credentialResponse.credential) {
+        throw new Error('No credential received from Google');
+      }
+      
+      await authApi.googleLogin(credentialResponse.credential);
       onLogin();
     } catch (error) {
       const err = error as Error;
@@ -94,6 +99,11 @@ const AuthPage = ({ onLogin, onSignupSuccess }: AuthPageProps): JSX.Element => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Google Sign-In error handler
+  const handleGoogleError = (): void => {
+    setApiError('Google sign-in was cancelled or failed. Please try again.');
   };
 
   const switchToLogin = (): void => {
@@ -132,15 +142,20 @@ const AuthPage = ({ onLogin, onSignupSuccess }: AuthPageProps): JSX.Element => {
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
-              <button 
-                type="button" 
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <GoogleIcon />
-                {isLoading ? 'Signing in...' : 'Sign in with Google'}
-              </button>
+              {/* Google Sign-In button - uses Google's official component */}
+              {/* This renders Google's branded button that handles the OAuth flow */}
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  size="large"
+                  width="100%"
+                  text="signin_with"
+                  shape="rectangular"
+                  useOneTap={false}
+                />
+              </div>
               
               <div className="flex items-center">
                 <hr className="flex-grow border-gray-200 dark:border-gray-600"/>
