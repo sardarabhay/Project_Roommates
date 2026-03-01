@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useSocket, useSocketEvent, SocketEvents } from './SocketContext';
-import { initializeFirebase, requestNotificationPermission as requestFcmPermission, onForegroundMessage } from '../lib/firebase';
+import { initializeFirebase, requestNotificationPermission as requestFcmPermission } from '../lib/firebase';
 import { registerFcmToken } from '../services/notifications';
 
 export interface Toast {
@@ -70,33 +70,9 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
     registerExistingPermission();
   }, [permissionGranted, fcmInitialized]);
 
-  // Handle FCM foreground messages
-  useEffect(() => {
-    if (!fcmInitialized) return;
-    
-    const unsubscribe = onForegroundMessage((payload: unknown) => {
-      const data = payload as { notification?: { title?: string; body?: string } };
-      if (data.notification) {
-        // Show as toast when in foreground
-        const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const newToast: Toast = {
-          id,
-          type: 'info',
-          title: data.notification.title || 'HarmonyHomes',
-          message: data.notification.body || '',
-        };
-        setToasts(prev => [...prev, newToast]);
-        
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== id));
-        }, 5000);
-      }
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [fcmInitialized]);
+  // FCM foreground messages are intentionally NOT handled here
+  // Socket.io already provides real-time in-app notifications (toasts)
+  // FCM is only for background/push notifications (handled by service worker)
 
   // Join household room when connected
   useEffect(() => {
@@ -113,12 +89,9 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
     console.log('🍞 Adding toast:', toast.title);
     setToasts(prev => [...prev, newToast]);
 
-    // Always show browser notification if permission granted
-    // Browser will handle showing it appropriately based on focus state
-    if (permissionGranted) {
-      console.log('🔔 Showing browser notification');
-      showBrowserNotification(toast.title, toast.message);
-    }
+    // Note: We DON'T show browser notifications here anymore
+    // Socket events = in-app toasts only
+    // FCM push = browser/push notifications (handled by service worker for background)
 
     // Auto-remove after duration
     const duration = toast.duration ?? 5000;
@@ -127,7 +100,7 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
         setToasts(prev => prev.filter(t => t.id !== id));
       }, duration);
     }
-  }, [permissionGranted]);
+  }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -164,15 +137,6 @@ export const NotificationProvider = ({ children, userId, householdId }: Notifica
       return false;
     }
   }, [fcmInitialized]);
-
-  const showBrowserNotification = (title: string, body: string) => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(title, {
-        body,
-        icon: '/favicon.ico',
-      });
-    }
-  };
 
   // Socket event handlers - show notifications for real-time events
   useSocketEvent<{ title: string; assignedToUser?: { name: string }; createdByUser?: { name: string } }>(

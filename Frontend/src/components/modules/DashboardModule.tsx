@@ -52,7 +52,7 @@ const DashboardModule = ({ setActiveModule, balances, user }: DashboardModulePro
       <ModuleHeader title={`Good Day, ${userName}!`} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveModule('finance')}>
-          <h3 className="font-bold text-lg mb-4 flex items-center">💰 Financial Summary</h3>
+          <h3 className="font-bold text-lg mb-4 flex items-center"> Financial Summary</h3>
           <div className="text-3xl font-bold text-red-500">You owe ₹{balances.youOwe.toFixed(2)}</div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">You are owed ₹{balances.youAreOwed.toFixed(2)}</p>
           <button className="text-teal-600 dark:text-teal-400 font-semibold mt-4 flex items-center group">
@@ -60,7 +60,7 @@ const DashboardModule = ({ setActiveModule, balances, user }: DashboardModulePro
           </button>
         </Card>
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveModule('chores')}>
-          <h3 className="font-bold text-lg mb-4 flex items-center">🧼 Your Next Chore</h3>
+          <h3 className="font-bold text-lg mb-4 flex items-center"> Your Next Chore</h3>
           {dashboard?.nextChore ? (
             <>
               <p className="text-xl font-semibold">{dashboard.nextChore.title}</p>
@@ -80,7 +80,7 @@ const DashboardModule = ({ setActiveModule, balances, user }: DashboardModulePro
           </div>
         </Card>
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveModule('events')}>
-          <h3 className="font-bold text-lg mb-4 flex items-center">🎉 Upcoming Event</h3>
+          <h3 className="font-bold text-lg mb-4 flex items-center"> Upcoming Event</h3>
           {dashboard?.upcomingEvent ? (
             <>
               <p className="text-xl font-semibold">{dashboard.upcomingEvent.title}</p>
