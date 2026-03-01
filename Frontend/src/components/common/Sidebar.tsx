@@ -1,4 +1,4 @@
-import { LayoutDashboard, Wallet, ListChecks, MessageCircle, Shield, Calendar, X, LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Wallet, ListChecks, MessageCircle, Shield, Calendar, LucideIcon } from 'lucide-react';
 import type { ModuleType } from '../../types';
 
 interface SidebarProps {

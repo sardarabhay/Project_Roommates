@@ -392,37 +392,7 @@ export const issuesApi = {
 };
 
 // === DOCUMENTS API ===
-interface CreateDocumentData {
-  name: string;
-  fileUrl?: string;
-  size?: string;
-}
 
-export const documentsApi = {
-  getAll: async (): Promise<HouseDocument[]> => {
-    return fetchWithAuth<HouseDocument[]>('/documents');
-  },
-
-  create: async (data: CreateDocumentData): Promise<HouseDocument> => {
-    return fetchWithAuth<HouseDocument>('/documents', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  update: async (id: number, data: Partial<CreateDocumentData>): Promise<HouseDocument> => {
-    return fetchWithAuth<HouseDocument>(`/documents/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  delete: async (id: number): Promise<{ message: string }> => {
-    return fetchWithAuth<{ message: string }>(`/documents/${id}`, {
-      method: 'DELETE',
-    });
-  },
-};
 
 // === LANDLORD API ===
 interface LandlordData {
@@ -501,5 +471,41 @@ export const communicationApi = {
 export const dashboardApi = {
   get: async (): Promise<DashboardData> => {
     return fetchWithAuth<DashboardData>('/dashboard');
+  },
+};
+// === DOCUMENTS API ===
+export const documentsApi = {
+  getAll: async (): Promise<HouseDocument[]> => {
+    return fetchWithAuth<HouseDocument[]>('/documents');
+  },
+
+  upload: async (file: File, name?: string): Promise<HouseDocument> => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    if (name) {
+      formData.append('name', name);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/documents`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to upload document');
+    }
+
+    return response.json();
+  },
+
+  delete: async (id: number): Promise<{ message: string }> => {
+    return fetchWithAuth<{ message: string }>(`/documents/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

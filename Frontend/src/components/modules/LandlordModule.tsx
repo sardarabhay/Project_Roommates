@@ -49,12 +49,9 @@ const LandlordModule = ({ onReportIssue, refreshKey }: LandlordModuleProps): JSX
   };
 
   const handleUploadDocument = async (): Promise<void> => {
-    if (newDocument.name) {
+    if (newDocument.name && newDocument.file) {
       try {
-        await documentsApi.create({
-          name: newDocument.name,
-          size: '1.2 MB' // Placeholder - real file upload would have actual size
-        });
+        await documentsApi.upload(newDocument.file, newDocument.name);
         fetchData(); // Refresh
         setNewDocument({ name: '', file: null });
         setShowUploadModal(false);
@@ -305,9 +302,16 @@ const LandlordModule = ({ onReportIssue, refreshKey }: LandlordModuleProps): JSX
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <button className="p-2 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded">
-                  <Download className="w-4 h-4" />
-                </button>
+                {doc.fileUrl && (
+                  <a 
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded"
+                  >
+                    <Download className="w-4 h-4" />
+                  </a>
+                )}
                 <button 
                   onClick={() => handleDeleteDocument(doc.id)}
                   className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
@@ -353,21 +357,41 @@ const LandlordModule = ({ onReportIssue, refreshKey }: LandlordModuleProps): JSX
                 </label>
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md">
                   <div className="space-y-1 text-center">
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                      <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none">
-                        <span>Upload a file</span>
-                        <input 
-                          id="file-upload" 
-                          name="file-upload" 
-                          type="file" 
-                          className="sr-only" 
-                          onChange={handleFileChange}
-                        />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">PDF, DOC up to 10MB</p>
+                    {newDocument.file ? (
+                      <>
+                        <FileText className="mx-auto h-12 w-12 text-teal-600" />
+                        <p className="text-sm font-medium text-teal-600">{newDocument.file.name}</p>
+                        <p className="text-xs text-gray-500">{(newDocument.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <label htmlFor="file-upload" className="cursor-pointer text-xs text-gray-500 hover:text-teal-600">
+                          Change file
+                          <input 
+                            id="file-upload" 
+                            name="file-upload" 
+                            type="file" 
+                            className="sr-only" 
+                            onChange={handleFileChange}
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                          <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-teal-600 hover:text-teal-500 focus-within:outline-none">
+                            <span>Upload a file</span>
+                            <input 
+                              id="file-upload" 
+                              name="file-upload" 
+                              type="file" 
+                              className="sr-only" 
+                              onChange={handleFileChange}
+                            />
+                          </label>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">PDF, DOC up to 10MB</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
