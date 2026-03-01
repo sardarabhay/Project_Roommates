@@ -2,7 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import multer from 'multer';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { uploadToCloudinary, deleteFromCloudinary, isCloudinaryConfigured } from '../lib/cloudinary.js';
+import { uploadToCloudinary, isCloudinaryConfigured } from '../lib/cloudinary.js';
 
 const router: Router = express.Router();
 
@@ -97,14 +97,12 @@ router.post('/', authenticateToken, upload.single('file'), async (req: Request, 
 
     let fileUrl: string;
     let fileSize: string;
-    let cloudinaryId: string | null = null;
 
     // Upload to Cloudinary if configured, otherwise use base64 (not recommended for production)
     if (isCloudinaryConfigured()) {
       const uploadResult = await uploadToCloudinary(file.buffer, file.originalname, 'harmony-homes/documents');
       fileUrl = uploadResult.url;
       fileSize = formatFileSize(uploadResult.size);
-      cloudinaryId = uploadResult.publicId;
     } else {
       // Fallback: Store as base64 data URL (only for development/testing)
       console.warn('⚠️ Cloudinary not configured - storing file as base64 (not recommended for production)');
