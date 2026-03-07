@@ -356,6 +356,7 @@ export const eventsApi = {
 interface CreateIssueData {
   title: string;
   description?: string;
+  priority?: string;
 }
 
 export const issuesApi = {

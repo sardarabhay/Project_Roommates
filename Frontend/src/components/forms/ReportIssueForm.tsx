@@ -1,7 +1,8 @@
-import { useState, ChangeEvent, FormEvent, TextareaHTMLAttributes } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent, TextareaHTMLAttributes } from 'react';
 import { X, Upload } from 'lucide-react';
 import FormInput from '../auth/FormInput';
-import { issuesApi } from '../../services/api';
+import { issuesApi, landlordApi } from '../../services/api';
+import type { Landlord } from '../../types';
 
 interface FormTextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
@@ -29,6 +30,7 @@ interface ReportIssueFormProps {
 interface IssueFormData {
   title: string;
   description: string;
+  priority: string;
 }
 
 interface FormErrors {
@@ -37,9 +39,14 @@ interface FormErrors {
 }
 
 const ReportIssueForm = ({ onClose, onSuccess }: ReportIssueFormProps): JSX.Element => {
-  const [formData, setFormData] = useState<IssueFormData>({ title: '', description: '' });
+  const [formData, setFormData] = useState<IssueFormData>({ title: '', description: '', priority: 'Medium' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [landlord, setLandlord] = useState<Landlord | null>(null);
+
+  useEffect(() => {
+    landlordApi.get().then(setLandlord).catch(() => {});
+  }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -62,7 +69,16 @@ const ReportIssueForm = ({ onClose, onSuccess }: ReportIssueFormProps): JSX.Elem
         await issuesApi.create({
           title: formData.title,
           description: formData.description,
+          priority: formData.priority,
         });
+
+        // Auto-open WhatsApp if landlord has a phone number
+        if (landlord?.phone) {
+          const phone = landlord.phone.replace(/[^\d+]/g, '');
+          const message = `🏠 Issue Reported: ${formData.title}\n\nPriority: ${formData.priority}${formData.description ? `\nDetails: ${formData.description}` : ''}`;
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+        }
+
         if (onSuccess) onSuccess();
         onClose();
       } catch (error) {
@@ -83,6 +99,19 @@ const ReportIssueForm = ({ onClose, onSuccess }: ReportIssueFormProps): JSX.Elem
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormInput label="Issue Title" name="title" placeholder="e.g., Leaky faucet in bathroom" value={formData.title} onChange={handleChange} error={errors.title} />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+          <select
+            name="priority"
+            value={formData.priority}
+            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+            className="w-full p-2 rounded-lg border bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
         <FormTextArea label="Description" name="description" placeholder="Provide more details about the issue..." value={formData.description} onChange={handleChange} />
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attach Photo (Optional)</label>
